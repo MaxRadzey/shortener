@@ -5,6 +5,7 @@ import (
 
 	httphandlers "github.com/MaxRadzey/shortener/internal/handler"
 	dbstorage "github.com/MaxRadzey/shortener/internal/storage"
+	"github.com/gin-gonic/gin"
 )
 
 // Run запускает http сервер.
@@ -12,9 +13,21 @@ func Run() error {
 	storage := dbstorage.NewStorage()
 	handler := &httphandlers.Handler{Storage: storage}
 
-	mux := http.NewServeMux()
-	mux.HandleFunc("/", handler.CreateUrl)
-	mux.HandleFunc("/{short_path}", handler.GetUrl)
+	r := SetupRouter(handler)
 
-	return http.ListenAndServe(":8080", mux)
+	return r.Run(":8080")
+}
+
+func SetupRouter(handler *httphandlers.Handler) *gin.Engine {
+	r := gin.Default()
+	r.HandleMethodNotAllowed = true
+
+	r.NoMethod(func(c *gin.Context) {
+		c.String(http.StatusMethodNotAllowed, "Method not allowed!")
+	})
+
+	r.POST("/", handler.CreateUrl)
+	r.GET("/:short_path", handler.GetUrl)
+
+	return r
 }
