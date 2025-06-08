@@ -92,7 +92,7 @@ func TestIsValidURL(t *testing.T) {
 	}
 }
 
-func TestGetUrl(t *testing.T) {
+func TestGetURL(t *testing.T) {
 	storage := &FakeStorage{
 		data: map[string]string{
 			"XxLlqM": "https://vk.com",
@@ -161,7 +161,7 @@ func TestGetUrl(t *testing.T) {
 	}
 }
 
-func TestCreateUrl(t *testing.T) {
+func TestCreateURL(t *testing.T) {
 	storage := &FakeStorage{
 		data: map[string]string{},
 	}

@@ -28,8 +28,5 @@ func GetShortPath(path string) (string, error) {
 // если строка - валидный URL, иначе False.
 func IsValidURL(urlToCheck string) bool {
 	_, err := url.ParseRequestURI(urlToCheck)
-	if err != nil {
-		return false
-	}
-	return true
+	return err == nil
 }
