@@ -1,6 +1,7 @@
 package app
 
 import (
+	"github.com/MaxRadzey/shortener/internal/config"
 	"net/http"
 
 	httphandlers "github.com/MaxRadzey/shortener/internal/handler"
@@ -9,13 +10,13 @@ import (
 )
 
 // Run запускает http сервер.
-func Run() error {
+func Run(AppConfig *config.Config) error {
 	storage := dbstorage.NewStorage()
-	handler := &httphandlers.Handler{Storage: storage}
+	handler := &httphandlers.Handler{Storage: storage, AppConfig: *AppConfig}
 
 	r := SetupRouter(handler)
 
-	return r.Run(":8080")
+	return r.Run(AppConfig.Address)
 }
 
 func SetupRouter(handler *httphandlers.Handler) *gin.Engine {

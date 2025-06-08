@@ -2,6 +2,7 @@ package handler
 
 import (
 	"fmt"
+	"github.com/MaxRadzey/shortener/internal/config"
 	"io"
 	"net/http"
 	"strings"
@@ -13,7 +14,8 @@ import (
 )
 
 type Handler struct {
-	Storage dbstorage.UrlStorage
+	Storage   dbstorage.UrlStorage
+	AppConfig config.Config
 }
 
 // CreateUrl хэндлер, обрабатывает POST-запросы, принимает текстовый URL в теле запроса,
@@ -46,7 +48,7 @@ func (h *Handler) CreateUrl(c *gin.Context) {
 
 	h.Storage.Create(shortPath, text)
 
-	result := fmt.Sprintf("http://%s/%s", c.Request.Host, shortPath)
+	result := fmt.Sprintf("%s/%s", h.AppConfig.ReturningAddress, shortPath)
 	c.Header("Content-Type", "text/plain; charset=utf-8")
 	c.String(http.StatusCreated, result)
 }
