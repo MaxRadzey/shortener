@@ -1,8 +1,9 @@
 package app
 
 import (
-	"github.com/MaxRadzey/shortener/internal/config"
 	"net/http"
+
+	"github.com/MaxRadzey/shortener/internal/config"
 
 	httphandlers "github.com/MaxRadzey/shortener/internal/handler"
 	dbstorage "github.com/MaxRadzey/shortener/internal/storage"

@@ -2,10 +2,11 @@ package handler
 
 import (
 	"fmt"
-	"github.com/MaxRadzey/shortener/internal/config"
 	"io"
 	"net/http"
 	"strings"
+
+	"github.com/MaxRadzey/shortener/internal/config"
 
 	"github.com/gin-gonic/gin"
 

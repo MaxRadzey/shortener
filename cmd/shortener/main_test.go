@@ -1,11 +1,12 @@
 package main
 
 import (
-	"github.com/MaxRadzey/shortener/internal/config"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"github.com/MaxRadzey/shortener/internal/config"
 
 	"github.com/MaxRadzey/shortener/internal/app"
 	"github.com/gin-gonic/gin"
