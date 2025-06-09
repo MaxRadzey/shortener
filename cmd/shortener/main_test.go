@@ -1,11 +1,12 @@
 package main
 
 import (
-	"github.com/MaxRadzey/shortener/internal/config"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"github.com/MaxRadzey/shortener/internal/config"
 
 	"github.com/MaxRadzey/shortener/internal/app"
 	"github.com/gin-gonic/gin"
@@ -91,7 +92,7 @@ func TestIsValidURL(t *testing.T) {
 	}
 }
 
-func TestGetUrl(t *testing.T) {
+func TestGetURL(t *testing.T) {
 	storage := &FakeStorage{
 		data: map[string]string{
 			"XxLlqM": "https://vk.com",
@@ -160,7 +161,7 @@ func TestGetUrl(t *testing.T) {
 	}
 }
 
-func TestCreateUrl(t *testing.T) {
+func TestCreateURL(t *testing.T) {
 	storage := &FakeStorage{
 		data: map[string]string{},
 	}

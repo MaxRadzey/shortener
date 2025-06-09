@@ -2,10 +2,11 @@ package handler
 
 import (
 	"fmt"
-	"github.com/MaxRadzey/shortener/internal/config"
 	"io"
 	"net/http"
 	"strings"
+
+	"github.com/MaxRadzey/shortener/internal/config"
 
 	"github.com/gin-gonic/gin"
 
@@ -14,14 +15,14 @@ import (
 )
 
 type Handler struct {
-	Storage   dbstorage.UrlStorage
+	Storage   dbstorage.URLStorage
 	AppConfig config.Config
 }
 
-// CreateUrl хэндлер, обрабатывает POST-запросы, принимает текстовый URL в теле запроса,
+// CreateURL хэндлер, обрабатывает POST-запросы, принимает текстовый URL в теле запроса,
 // создает короткий путь и возвращает ег ов виде строки с полным URL.
 // Ожидается Content-Type: text/plain
-func (h *Handler) CreateUrl(c *gin.Context) {
+func (h *Handler) CreateURL(c *gin.Context) {
 	contentType := c.GetHeader("Content-Type")
 	if !strings.HasPrefix(contentType, "text/plain") {
 		c.String(http.StatusBadRequest, "Invalid Content-Type!")
@@ -53,16 +54,16 @@ func (h *Handler) CreateUrl(c *gin.Context) {
 	c.String(http.StatusCreated, result)
 }
 
-// GetUrl хэндлер, обрабатывает GET-запросы, получает в качестве параметра маршрута сокращенное значение URL,
+// GetURL хэндлер, обрабатывает GET-запросы, получает в качестве параметра маршрута сокращенное значение URL,
 // ищет в БД совпадение длинного пути и производит редирект на него (307), иначе отдает (404) ошибку.
-func (h *Handler) GetUrl(c *gin.Context) {
+func (h *Handler) GetURL(c *gin.Context) {
 	shortPath := c.Param("short_path")
-	longUrl := h.Storage.Get(shortPath)
+	longURL := h.Storage.Get(shortPath)
 
-	if longUrl == "" {
+	if longURL == "" {
 		c.String(http.StatusNotFound, "Not found!")
 		return
 	}
 
-	c.Redirect(http.StatusTemporaryRedirect, longUrl)
+	c.Redirect(http.StatusTemporaryRedirect, longURL)
 }

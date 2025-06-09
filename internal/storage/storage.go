@@ -1,6 +1,6 @@
 package storage
 
-type UrlStorage interface {
+type URLStorage interface {
 	Get(short string) string
 	Create(short, full string)
 }

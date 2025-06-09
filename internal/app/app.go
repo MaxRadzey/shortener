@@ -1,8 +1,9 @@
 package app
 
 import (
-	"github.com/MaxRadzey/shortener/internal/config"
 	"net/http"
+
+	"github.com/MaxRadzey/shortener/internal/config"
 
 	httphandlers "github.com/MaxRadzey/shortener/internal/handler"
 	dbstorage "github.com/MaxRadzey/shortener/internal/storage"
@@ -27,8 +28,8 @@ func SetupRouter(handler *httphandlers.Handler) *gin.Engine {
 		c.String(http.StatusMethodNotAllowed, "Method not allowed!")
 	})
 
-	r.POST("/", handler.CreateUrl)
-	r.GET("/:short_path", handler.GetUrl)
+	r.POST("/", handler.CreateURL)
+	r.GET("/:short_path", handler.GetURL)
 
 	return r
 }
