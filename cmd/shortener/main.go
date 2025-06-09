@@ -1,9 +1,18 @@
 package main
 
-import "github.com/MaxRadzey/shortener/internal/app"
+import (
+	"github.com/MaxRadzey/shortener/internal/app"
+	"github.com/MaxRadzey/shortener/internal/config"
+)
 
 func main() {
-	if err := app.Run(); err != nil {
+	AppConfig := config.New()
+
+	config.ParseEnv(AppConfig)
+
+	ParseFlag(AppConfig)
+
+	if err := app.Run(AppConfig); err != nil {
 		panic(err)
 	}
 }

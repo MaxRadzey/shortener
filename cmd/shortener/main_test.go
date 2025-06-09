@@ -1,6 +1,7 @@
 package main
 
 import (
+	"github.com/MaxRadzey/shortener/internal/config"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -15,6 +16,8 @@ import (
 
 	httphandlers "github.com/MaxRadzey/shortener/internal/handler"
 )
+
+var AppConfig = config.New()
 
 type FakeStorage struct {
 	data map[string]string
@@ -95,7 +98,7 @@ func TestGetUrl(t *testing.T) {
 		},
 	}
 
-	handler := &httphandlers.Handler{Storage: storage}
+	handler := &httphandlers.Handler{Storage: storage, AppConfig: *AppConfig}
 
 	type want struct {
 		code     int
@@ -162,7 +165,7 @@ func TestCreateUrl(t *testing.T) {
 		data: map[string]string{},
 	}
 
-	handler := &httphandlers.Handler{Storage: storage}
+	handler := &httphandlers.Handler{Storage: storage, AppConfig: *AppConfig}
 
 	type want struct {
 		code     int
@@ -183,7 +186,7 @@ func TestCreateUrl(t *testing.T) {
 			contentType: "text/plain; charset=utf-8",
 			want: want{
 				code:     http.StatusCreated,
-				response: "http://example.com/XxLlqM",
+				response: AppConfig.ReturningAddress + "/XxLlqM",
 			},
 		},
 		{
