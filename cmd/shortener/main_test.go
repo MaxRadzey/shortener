@@ -6,6 +6,9 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/MaxRadzey/shortener/internal/app"
+	"github.com/gin-gonic/gin"
+
 	"github.com/MaxRadzey/shortener/internal/utils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -55,6 +58,32 @@ func TestGetShortPath(t *testing.T) {
 				return
 			}
 			assert.Error(t, err)
+		})
+	}
+}
+
+func TestIsValidURL(t *testing.T) {
+	tests := []struct {
+		name     string
+		inputURL string
+		want     bool
+	}{
+		{
+			name:     "Valid URL",
+			inputURL: "https://vk.ccom",
+			want:     true,
+		},
+		{
+			name:     "Invalid URL",
+			inputURL: "123",
+			want:     false,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			result := utils.IsValidURL(test.inputURL)
+			assert.Equal(t, result, test.want)
 		})
 	}
 }
@@ -110,11 +139,14 @@ func TestGetUrl(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			r := httptest.NewRequest(test.method, "/", nil)
-			r.SetPathValue("short_path", test.request)
+			gin.SetMode(gin.TestMode)
+
+			router := app.SetupRouter(handler)
+
+			r := httptest.NewRequest(test.method, "/"+test.request, nil)
 			w := httptest.NewRecorder()
 
-			handler.GetUrl(w, r)
+			router.ServeHTTP(w, r)
 
 			assert.Equal(t, test.want.code, w.Code, "Код ответа не совпадает с ожидаемым")
 
@@ -135,7 +167,6 @@ func TestCreateUrl(t *testing.T) {
 	type want struct {
 		code     int
 		response string
-		//contentType string
 	}
 
 	tests := []struct {
@@ -162,7 +193,7 @@ func TestCreateUrl(t *testing.T) {
 			contentType: "text/plain; charset=utf-8",
 			want: want{
 				code:     http.StatusMethodNotAllowed,
-				response: "Allowed only POST method!\n",
+				response: "Method not allowed!",
 			},
 		},
 		{
@@ -172,7 +203,7 @@ func TestCreateUrl(t *testing.T) {
 			contentType: "application/json; charset=utf-8",
 			want: want{
 				code:     http.StatusBadRequest,
-				response: "Invalid Content-Type!\n",
+				response: "Invalid Content-Type!",
 			},
 		},
 		{
@@ -182,19 +213,24 @@ func TestCreateUrl(t *testing.T) {
 			contentType: "text/plain; charset=utf-8",
 			want: want{
 				code:     http.StatusBadRequest,
-				response: "Invalid Body!\n",
+				response: "Invalid Body!",
 			},
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			bodyReader := strings.NewReader(test.body)
-			r := httptest.NewRequest(test.method, "/", bodyReader)
+			gin.SetMode(gin.TestMode)
+
+			router := app.SetupRouter(handler)
+
+			requestBody := strings.NewReader(test.body)
+
+			r := httptest.NewRequest(test.method, "/", requestBody)
 			r.Header.Set("Content-Type", test.contentType)
 			w := httptest.NewRecorder()
 
-			handler.CreateUrl(w, r)
+			router.ServeHTTP(w, r)
 
 			require.Equal(t, test.want.code, w.Code, "Код ответа не совпадает с ожидаемым")
 			require.Equal(t, test.want.response, w.Body.String(), "Body не совпадает с ожидаемым")

@@ -6,6 +6,8 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/gin-gonic/gin"
+
 	dbstorage "github.com/MaxRadzey/shortener/internal/storage"
 	"github.com/MaxRadzey/shortener/internal/utils"
 )
@@ -17,65 +19,48 @@ type Handler struct {
 // CreateUrl хэндлер, обрабатывает POST-запросы, принимает текстовый URL в теле запроса,
 // создает короткий путь и возвращает ег ов виде строки с полным URL.
 // Ожидается Content-Type: text/plain
-func (h *Handler) CreateUrl(res http.ResponseWriter, req *http.Request) {
-	if req.Method != http.MethodPost {
-		http.Error(res, "Allowed only POST method!", http.StatusMethodNotAllowed)
-		return
-	}
-
-	contentType := req.Header.Get("Content-Type")
+func (h *Handler) CreateUrl(c *gin.Context) {
+	contentType := c.GetHeader("Content-Type")
 	if !strings.HasPrefix(contentType, "text/plain") {
-		http.Error(res, "Invalid Content-Type!", http.StatusBadRequest)
+		c.String(http.StatusBadRequest, "Invalid Content-Type!")
 		return
 	}
 
-	if err := req.ParseForm(); err != nil {
-		_, _ = res.Write([]byte(err.Error()))
-		return
-	}
-
-	body, err := io.ReadAll(req.Body)
+	body, err := io.ReadAll(c.Request.Body)
 	if err != nil {
-		http.Error(res, "Error occurred while reading body", http.StatusInternalServerError)
+		c.String(http.StatusInternalServerError, "Error occurred while reading body!")
 		return
 	}
 
 	text := string(body)
 	if !utils.IsValidURL(text) {
-		http.Error(res, "Invalid Body!", http.StatusBadRequest)
+		c.String(http.StatusBadRequest, "Invalid Body!")
 		return
 	}
 
 	shortPath, err := utils.GetShortPath(text)
-
 	if err != nil {
-		http.Error(res, err.Error(), http.StatusBadRequest)
+		c.String(http.StatusInternalServerError, "Internal server error!")
+		return
 	}
 
 	h.Storage.Create(shortPath, text)
 
-	res.WriteHeader(http.StatusCreated)
-	res.Header().Set("Content-Type", "text/plain; charset=utf-8")
-	result := fmt.Sprintf("http://%s/%s", req.Host, shortPath)
-	_, _ = res.Write([]byte(result))
+	result := fmt.Sprintf("http://%s/%s", c.Request.Host, shortPath)
+	c.Header("Content-Type", "text/plain; charset=utf-8")
+	c.String(http.StatusCreated, result)
 }
 
 // GetUrl хэндлер, обрабатывает GET-запросы, получает в качестве параметра маршрута сокращенное значение URL,
 // ищет в БД совпадение длинного пути и производит редирект на него (307), иначе отдает (404) ошибку.
-func (h *Handler) GetUrl(res http.ResponseWriter, req *http.Request) {
-	if req.Method != http.MethodGet {
-		res.WriteHeader(http.StatusMethodNotAllowed)
-		return
-	}
-
-	shortPath := req.PathValue("short_path")
+func (h *Handler) GetUrl(c *gin.Context) {
+	shortPath := c.Param("short_path")
 	longUrl := h.Storage.Get(shortPath)
 
 	if longUrl == "" {
-		res.WriteHeader(http.StatusNotFound)
+		c.String(http.StatusNotFound, "Not found!")
 		return
 	}
 
-	res.Header().Set("Location", longUrl)
-	res.WriteHeader(http.StatusTemporaryRedirect)
+	c.Redirect(http.StatusTemporaryRedirect, longUrl)
 }
