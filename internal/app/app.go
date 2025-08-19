@@ -40,8 +40,11 @@ func SetupRouter(handler *httphandlers.Handler) *gin.Engine {
 	r.Use(logger.RequestLogger())
 	r.Use(logger.ResponseLogger())
 
+	api := r.Group("/api")
+
 	r.POST("/", handler.CreateURL)
 	r.GET("/:short_path", handler.GetURL)
+	api.POST("/shorten", handler.GetUrlJSON)
 
 	return r
 }
