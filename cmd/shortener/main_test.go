@@ -294,6 +294,16 @@ func TestGetUrlJSON(t *testing.T) {
 				response: "invalid request",
 			},
 		},
+		{
+			name:        "Test #4 empty request body",
+			method:      http.MethodPost,
+			request:     models.Request{URL: ""},
+			contentType: "application/json",
+			want: want{
+				code:     http.StatusBadRequest,
+				response: "invalid request",
+			},
+		},
 	}
 
 	for _, test := range tests {

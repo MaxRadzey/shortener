@@ -78,6 +78,11 @@ func (h *Handler) GetUrlJSON(c *gin.Context) {
 		return
 	}
 
+	if req.URL == "" {
+		c.String(http.StatusBadRequest, "invalid request")
+		return
+	}
+
 	shortPath, err := utils.GetShortPath(req.URL)
 	if err != nil {
 		c.String(http.StatusInternalServerError, "Internal server error!")
