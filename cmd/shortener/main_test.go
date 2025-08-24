@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"github.com/MaxRadzey/shortener/internal/models"
 	"net/http"
 	"net/http/httptest"
@@ -27,12 +28,17 @@ type FakeStorage struct {
 	data map[string]string
 }
 
-func (f *FakeStorage) Get(short string) string {
-	return f.data[short]
+func (f *FakeStorage) Get(short string) (string, error) {
+	val, ok := f.data[short]
+	if !ok {
+		return "", errors.New("not found")
+	}
+	return val, nil
 }
 
-func (f *FakeStorage) Create(short, full string) {
+func (f *FakeStorage) Create(short, full string) error {
 	f.data[short] = full
+	return nil
 }
 
 func TestGetShortPath(t *testing.T) {
@@ -204,16 +210,6 @@ func TestCreateURL(t *testing.T) {
 			},
 		},
 		{
-			name:        "Test #4 send invalid content type",
-			method:      http.MethodPost,
-			body:        "{'url': https://abc.ru}",
-			contentType: "application/json; charset=utf-8",
-			want: want{
-				code:     http.StatusBadRequest,
-				response: "Invalid Content-Type!",
-			},
-		},
-		{
 			name:        "Test #3 send invalid body",
 			method:      http.MethodPost,
 			body:        "123",
@@ -245,7 +241,7 @@ func TestCreateURL(t *testing.T) {
 	}
 }
 
-func TestGetUrlJSON(t *testing.T) {
+func TestGetURLJSON(t *testing.T) {
 	storage := &FakeStorage{
 		data: map[string]string{},
 	}

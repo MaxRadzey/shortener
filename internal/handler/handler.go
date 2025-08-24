@@ -5,14 +5,11 @@ import (
 	"fmt"
 	"github.com/MaxRadzey/shortener/internal/config"
 	"github.com/MaxRadzey/shortener/internal/models"
-	"io"
-	"net/http"
-	"strings"
-
-	"github.com/gin-gonic/gin"
-
 	dbstorage "github.com/MaxRadzey/shortener/internal/storage"
 	"github.com/MaxRadzey/shortener/internal/utils"
+	"github.com/gin-gonic/gin"
+	"io"
+	"net/http"
 )
 
 type Handler struct {
@@ -24,13 +21,6 @@ type Handler struct {
 // создает короткий путь и возвращает ег ов виде строки с полным URL.
 // Ожидается Content-Type: text/plain
 func (h *Handler) CreateURL(c *gin.Context) {
-	contentType := c.GetHeader("Content-Type")
-	if !strings.HasPrefix(contentType, "text/plain") &&
-		!strings.HasPrefix(contentType, "application/octet-stream") {
-		c.String(http.StatusBadRequest, "Invalid Content-Type!")
-		return
-	}
-
 	body, err := io.ReadAll(c.Request.Body)
 	if err != nil {
 		c.String(http.StatusInternalServerError, "Error occurred while reading body!")
@@ -49,7 +39,11 @@ func (h *Handler) CreateURL(c *gin.Context) {
 		return
 	}
 
-	h.Storage.Create(shortPath, text)
+	err = h.Storage.Create(shortPath, text)
+	if err != nil {
+		c.String(http.StatusInternalServerError, "Internal server error!")
+		return
+	}
 
 	result := fmt.Sprintf("%s/%s", h.AppConfig.ReturningAddress, shortPath)
 	c.Header("Content-Type", "text/plain; charset=utf-8")
@@ -60,7 +54,7 @@ func (h *Handler) CreateURL(c *gin.Context) {
 // ищет в БД совпадение длинного пути и производит редирект на него (307), иначе отдает (404) ошибку.
 func (h *Handler) GetURL(c *gin.Context) {
 	shortPath := c.Param("short_path")
-	longURL := h.Storage.Get(shortPath)
+	longURL, _ := h.Storage.Get(shortPath)
 
 	if longURL == "" {
 		c.String(http.StatusNotFound, "Not found!")
@@ -70,7 +64,7 @@ func (h *Handler) GetURL(c *gin.Context) {
 	c.Redirect(http.StatusTemporaryRedirect, longURL)
 }
 
-func (h *Handler) GetUrlJSON(c *gin.Context) {
+func (h *Handler) GetURLJSON(c *gin.Context) {
 	var req models.Request
 
 	if err := json.NewDecoder(c.Request.Body).Decode(&req); err != nil {
@@ -89,7 +83,11 @@ func (h *Handler) GetUrlJSON(c *gin.Context) {
 		return
 	}
 
-	h.Storage.Create(shortPath, req.URL)
+	err = h.Storage.Create(shortPath, req.URL)
+	if err != nil {
+		c.String(http.StatusInternalServerError, "Internal server error!")
+		return
+	}
 
 	resp := models.Response{Result: fmt.Sprintf("%s/%s", h.AppConfig.ReturningAddress, shortPath)}
 

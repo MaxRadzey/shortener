@@ -13,7 +13,11 @@ import (
 
 // Run запускает http сервер.
 func Run(AppConfig *config.Config) error {
-	storage := dbstorage.NewStorage()
+	storage, err := dbstorage.NewStorage(AppConfig.FilePath)
+	if err != nil {
+		return err
+	}
+
 	handler := &httphandlers.Handler{Storage: storage, AppConfig: *AppConfig}
 
 	if err := logger.Initialize(AppConfig.LogLevel); err != nil {
@@ -43,7 +47,7 @@ func SetupRouter(handler *httphandlers.Handler) *gin.Engine {
 
 	r.POST("/", handler.CreateURL)
 	r.GET("/:short_path", handler.GetURL)
-	r.POST("/api/shorten", handler.GetUrlJSON)
+	r.POST("/api/shorten", handler.GetURLJSON)
 
 	return r
 }
