@@ -1,12 +1,14 @@
 package handler
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"strings"
 
 	"github.com/MaxRadzey/shortener/internal/config"
+	"github.com/MaxRadzey/shortener/internal/models"
 
 	"github.com/gin-gonic/gin"
 
@@ -66,4 +68,36 @@ func (h *Handler) GetURL(c *gin.Context) {
 	}
 
 	c.Redirect(http.StatusTemporaryRedirect, longURL)
+}
+
+func (h *Handler) GetUrlJSON(c *gin.Context) {
+	var req models.Request
+
+	if err := json.NewDecoder(c.Request.Body).Decode(&req); err != nil {
+		c.String(http.StatusBadRequest, "invalid request")
+		return
+	}
+
+	if req.URL == "" {
+		c.String(http.StatusBadRequest, "invalid request")
+		return
+	}
+
+	shortPath, err := utils.GetShortPath(req.URL)
+	if err != nil {
+		c.String(http.StatusInternalServerError, "Internal server error!")
+		return
+	}
+
+	h.Storage.Create(shortPath, req.URL)
+
+	resp := models.Response{Result: fmt.Sprintf("%s/%s", h.AppConfig.ReturningAddress, shortPath)}
+
+	c.Writer.Header().Set("Content-Type", "application/json")
+	c.Writer.WriteHeader(http.StatusCreated)
+
+	if err := json.NewEncoder(c.Writer).Encode(resp); err != nil {
+		c.String(http.StatusInternalServerError, "Internal server error!")
+		return
+	}
 }
