@@ -3,6 +3,8 @@ package main
 import (
 	"github.com/MaxRadzey/shortener/internal/app"
 	"github.com/MaxRadzey/shortener/internal/config"
+	"github.com/MaxRadzey/shortener/internal/logger"
+	"go.uber.org/zap"
 )
 
 func main() {
@@ -15,4 +17,5 @@ func main() {
 	if err := app.Run(AppConfig); err != nil {
 		panic(err)
 	}
+	logger.Log.Info("running server", zap.String("address", AppConfig.Address))
 }

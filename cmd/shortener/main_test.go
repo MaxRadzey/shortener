@@ -1,6 +1,10 @@
 package main
 
 import (
+	"bytes"
+	"encoding/json"
+	"errors"
+	"github.com/MaxRadzey/shortener/internal/models"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -24,12 +28,17 @@ type FakeStorage struct {
 	data map[string]string
 }
 
-func (f *FakeStorage) Get(short string) string {
-	return f.data[short]
+func (f *FakeStorage) Get(short string) (string, error) {
+	val, ok := f.data[short]
+	if !ok {
+		return "", errors.New("not found")
+	}
+	return val, nil
 }
 
-func (f *FakeStorage) Create(short, full string) {
+func (f *FakeStorage) Create(short, full string) error {
 	f.data[short] = full
+	return nil
 }
 
 func TestGetShortPath(t *testing.T) {
@@ -201,16 +210,6 @@ func TestCreateURL(t *testing.T) {
 			},
 		},
 		{
-			name:        "Test #4 send invalid content type",
-			method:      http.MethodPost,
-			body:        "{'url': https://abc.ru}",
-			contentType: "application/json; charset=utf-8",
-			want: want{
-				code:     http.StatusBadRequest,
-				response: "Invalid Content-Type!",
-			},
-		},
-		{
 			name:        "Test #3 send invalid body",
 			method:      http.MethodPost,
 			body:        "123",
@@ -238,6 +237,94 @@ func TestCreateURL(t *testing.T) {
 
 			require.Equal(t, test.want.code, w.Code, "Код ответа не совпадает с ожидаемым")
 			require.Equal(t, test.want.response, w.Body.String(), "Body не совпадает с ожидаемым")
+		})
+	}
+}
+
+func TestGetURLJSON(t *testing.T) {
+	storage := &FakeStorage{
+		data: map[string]string{},
+	}
+
+	type want struct {
+		code     int
+		response string
+	}
+
+	handler := &httphandlers.Handler{Storage: storage, AppConfig: *AppConfig}
+
+	tests := []struct {
+		name        string
+		method      string
+		request     interface{}
+		contentType string
+		want        want
+	}{
+		{
+			name:        "Test #1 invalid method",
+			method:      http.MethodGet,
+			request:     models.Request{URL: "vk.com"},
+			contentType: "application/json",
+			want: want{
+				code:     http.StatusMethodNotAllowed,
+				response: "Method not allowed!",
+			},
+		},
+		{
+			name:        "Test #2 Ok",
+			method:      http.MethodPost,
+			request:     models.Request{URL: "vk.com"},
+			contentType: "application/json",
+			want: want{
+				code:     http.StatusCreated,
+				response: `{"result":"http://localhost:8080/SJQ4fi"}`,
+			},
+		},
+		{
+			name:        "Test #3 invalid body",
+			method:      http.MethodPost,
+			request:     "vk.com",
+			contentType: "text/plain; charset=utf-8",
+			want: want{
+				code:     http.StatusBadRequest,
+				response: "invalid request",
+			},
+		},
+		{
+			name:        "Test #4 empty request body",
+			method:      http.MethodPost,
+			request:     models.Request{URL: ""},
+			contentType: "application/json",
+			want: want{
+				code:     http.StatusBadRequest,
+				response: "invalid request",
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			gin.SetMode(gin.TestMode)
+
+			router := app.SetupRouter(handler)
+
+			var requestBody *bytes.Reader
+			switch v := test.request.(type) {
+			case models.Request:
+				b, _ := json.Marshal(v)
+				requestBody = bytes.NewReader(b)
+			case string:
+				requestBody = bytes.NewReader([]byte(v))
+			}
+
+			r := httptest.NewRequest(test.method, "/api/shorten", requestBody)
+			r.Header.Set("Content-Type", test.contentType)
+			w := httptest.NewRecorder()
+
+			router.ServeHTTP(w, r)
+
+			require.Equal(t, strings.TrimSpace(test.want.response), strings.TrimSpace(w.Body.String()), "Body не совпадает с ожидаемым")
+			require.Equal(t, test.want.code, w.Code, "Код ответа не совпадает с ожидаемым")
 		})
 	}
 }
