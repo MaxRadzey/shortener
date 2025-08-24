@@ -1,11 +1,11 @@
 package app
 
 import (
+	gzipMiddleware "github.com/MaxRadzey/shortener/internal/gzip"
 	"github.com/MaxRadzey/shortener/internal/logger"
 	"net/http"
 
 	"github.com/MaxRadzey/shortener/internal/config"
-
 	httphandlers "github.com/MaxRadzey/shortener/internal/handler"
 	dbstorage "github.com/MaxRadzey/shortener/internal/storage"
 	"github.com/gin-gonic/gin"
@@ -39,12 +39,11 @@ func SetupRouter(handler *httphandlers.Handler) *gin.Engine {
 
 	r.Use(logger.RequestLogger())
 	r.Use(logger.ResponseLogger())
-
-	api := r.Group("/api")
+	r.Use(gzipMiddleware.GzipMiddleware())
 
 	r.POST("/", handler.CreateURL)
 	r.GET("/:short_path", handler.GetURL)
-	api.POST("/shorten", handler.GetUrlJSON)
+	r.POST("/api/shorten", handler.GetUrlJSON)
 
 	return r
 }

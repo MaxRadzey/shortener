@@ -3,12 +3,11 @@ package handler
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/MaxRadzey/shortener/internal/config"
+	"github.com/MaxRadzey/shortener/internal/models"
 	"io"
 	"net/http"
 	"strings"
-
-	"github.com/MaxRadzey/shortener/internal/config"
-	"github.com/MaxRadzey/shortener/internal/models"
 
 	"github.com/gin-gonic/gin"
 
@@ -26,7 +25,8 @@ type Handler struct {
 // Ожидается Content-Type: text/plain
 func (h *Handler) CreateURL(c *gin.Context) {
 	contentType := c.GetHeader("Content-Type")
-	if !strings.HasPrefix(contentType, "text/plain") {
+	if !strings.HasPrefix(contentType, "text/plain") &&
+		!strings.HasPrefix(contentType, "application/octet-stream") {
 		c.String(http.StatusBadRequest, "Invalid Content-Type!")
 		return
 	}
