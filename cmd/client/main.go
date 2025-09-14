@@ -19,7 +19,8 @@ func main() {
 	reader := bufio.NewReader(os.Stdin)
 	long, err := reader.ReadString('\n')
 	if err != nil {
-		panic(err)
+		fmt.Printf("Ошибка чтения ввода: %v\n", err)
+		return
 	}
 	data.Set("url", long)
 
@@ -36,12 +37,13 @@ func main() {
 		panic(err)
 	}
 
-	fmt.Println("Статус-код ")
+	fmt.Printf("Статус-код: %d\n", response.StatusCode)
 	defer response.Body.Close()
 
 	body, err := io.ReadAll(response.Body)
 	if err != nil {
-		panic(err)
+		fmt.Printf("Ошибка чтения ответа: %v\n", err)
+		return
 	}
 
 	fmt.Println(string(body))
