@@ -7,6 +7,7 @@ type Config struct {
 	ReturningAddress string
 	LogLevel         string
 	FilePath         string
+	DatabaseDSN      string
 }
 
 func New() *Config {
@@ -29,6 +30,9 @@ func ParseEnv(config *Config) {
 		config.LogLevel = LogLevel
 	}
 	if FilePath := os.Getenv("FILE_PATH"); FilePath != "" {
-		config.LogLevel = FilePath
+		config.FilePath = FilePath
+	}
+	if DatabaseDSN := os.Getenv("DATABASE_DSN"); DatabaseDSN != "" {
+		config.DatabaseDSN = DatabaseDSN
 	}
 }
