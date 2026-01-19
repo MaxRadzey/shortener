@@ -8,6 +8,8 @@ import (
 	"os"
 )
 
+var ErrNotFound = errors.New("url not found")
+
 type URLStorage interface {
 	Get(short string) (string, error)
 	Create(short, full string) error
@@ -83,7 +85,7 @@ func (s *Storage) Create(id, url string) error {
 func (s *Storage) Get(id string) (string, error) {
 	url, ok := s.data[id]
 	if !ok {
-		return "", errors.New("url not found")
+		return "", ErrNotFound
 	}
 
 	return url, nil

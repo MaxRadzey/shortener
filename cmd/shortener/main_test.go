@@ -3,12 +3,12 @@ package main
 import (
 	"bytes"
 	"encoding/json"
-	"errors"
-	"github.com/MaxRadzey/shortener/internal/models"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"github.com/MaxRadzey/shortener/internal/models"
 
 	"github.com/MaxRadzey/shortener/internal/config"
 
@@ -20,6 +20,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	httphandlers "github.com/MaxRadzey/shortener/internal/handler"
+	dbstorage "github.com/MaxRadzey/shortener/internal/storage"
 )
 
 var AppConfig = config.New()
@@ -31,7 +32,7 @@ type FakeStorage struct {
 func (f *FakeStorage) Get(short string) (string, error) {
 	val, ok := f.data[short]
 	if !ok {
-		return "", errors.New("not found")
+		return "", dbstorage.ErrNotFound
 	}
 	return val, nil
 }
