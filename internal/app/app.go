@@ -1,12 +1,14 @@
 package app
 
 import (
+	"net/http"
+
 	gzipMiddleware "github.com/MaxRadzey/shortener/internal/gzip"
 	"github.com/MaxRadzey/shortener/internal/logger"
-	"net/http"
 
 	"github.com/MaxRadzey/shortener/internal/config"
 	httphandlers "github.com/MaxRadzey/shortener/internal/handler"
+	"github.com/MaxRadzey/shortener/internal/service"
 	dbstorage "github.com/MaxRadzey/shortener/internal/storage"
 	"github.com/gin-gonic/gin"
 )
@@ -18,7 +20,8 @@ func Run(AppConfig *config.Config) error {
 		return err
 	}
 
-	handler := &httphandlers.Handler{Storage: storage, AppConfig: *AppConfig}
+	urlService := service.NewService(storage, *AppConfig)
+	handler := &httphandlers.Handler{Service: urlService}
 
 	if err := logger.Initialize(AppConfig.LogLevel); err != nil {
 		return err

@@ -20,6 +20,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	httphandlers "github.com/MaxRadzey/shortener/internal/handler"
+	"github.com/MaxRadzey/shortener/internal/service"
 	dbstorage "github.com/MaxRadzey/shortener/internal/storage"
 )
 
@@ -109,7 +110,8 @@ func TestGetURL(t *testing.T) {
 		},
 	}
 
-	handler := &httphandlers.Handler{Storage: storage, AppConfig: *AppConfig}
+	urlService := service.NewService(storage, *AppConfig)
+	handler := &httphandlers.Handler{Service: urlService}
 
 	type want struct {
 		code     int
@@ -176,7 +178,8 @@ func TestCreateURL(t *testing.T) {
 		data: map[string]string{},
 	}
 
-	handler := &httphandlers.Handler{Storage: storage, AppConfig: *AppConfig}
+	urlService := service.NewService(storage, *AppConfig)
+	handler := &httphandlers.Handler{Service: urlService}
 
 	type want struct {
 		code     int
@@ -252,7 +255,8 @@ func TestGetURLJSON(t *testing.T) {
 		response string
 	}
 
-	handler := &httphandlers.Handler{Storage: storage, AppConfig: *AppConfig}
+	urlService := service.NewService(storage, *AppConfig)
+	handler := &httphandlers.Handler{Service: urlService}
 
 	tests := []struct {
 		name        string
