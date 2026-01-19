@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"sync"
 )
 
 var ErrNotFound = errors.New("url not found")
@@ -16,6 +17,7 @@ type URLStorage interface {
 }
 
 type Storage struct {
+	mu       sync.RWMutex
 	data     map[string]string
 	filePath string
 }
@@ -58,7 +60,13 @@ func readLines(filePath string) (map[string]string, error) {
 }
 
 func (s *Storage) Create(id, url string) error {
+	s.mu.Lock()
 	s.data[id] = url
+	dataCopy := make(map[string]string)
+	for k, v := range s.data {
+		dataCopy[k] = v
+	}
+	s.mu.Unlock()
 
 	file, err := os.OpenFile(s.filePath, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0755)
 	if err != nil {
@@ -69,7 +77,7 @@ func (s *Storage) Create(id, url string) error {
 		_ = file.Close()
 	}(file)
 
-	data, err := json.Marshal(s.data)
+	data, err := json.Marshal(dataCopy)
 	if err != nil {
 		return fmt.Errorf("serialize url error: %w", err)
 	}
@@ -83,6 +91,9 @@ func (s *Storage) Create(id, url string) error {
 }
 
 func (s *Storage) Get(id string) (string, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
 	url, ok := s.data[id]
 	if !ok {
 		return "", ErrNotFound
