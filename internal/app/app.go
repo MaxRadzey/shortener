@@ -1,9 +1,13 @@
 package app
 
 import (
+	"context"
+	"net/http"
+
+	"github.com/MaxRadzey/shortener/internal/db"
 	gzipMiddleware "github.com/MaxRadzey/shortener/internal/gzip"
 	"github.com/MaxRadzey/shortener/internal/logger"
-	"net/http"
+	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/MaxRadzey/shortener/internal/config"
 	httphandlers "github.com/MaxRadzey/shortener/internal/handler"
@@ -13,12 +17,23 @@ import (
 
 // Run запускает http сервер.
 func Run(AppConfig *config.Config) error {
+	ctx := context.Background()
+
 	storage, err := dbstorage.NewStorage(AppConfig.FilePath)
 	if err != nil {
 		return err
 	}
 
-	handler := &httphandlers.Handler{Storage: storage, AppConfig: *AppConfig}
+	var dbpool *pgxpool.Pool
+	if AppConfig.DBConfig.DSN != "" {
+		dbpool, err = db.NewPool(ctx, AppConfig.DBConfig.DSN)
+		if err != nil {
+			return err
+		}
+		defer dbpool.Close()
+	}
+
+	handler := &httphandlers.Handler{Storage: storage, AppConfig: *AppConfig, DBPool: dbpool}
 
 	if err := logger.Initialize(AppConfig.LogLevel); err != nil {
 		return err
@@ -48,6 +63,7 @@ func SetupRouter(handler *httphandlers.Handler) *gin.Engine {
 	r.POST("/", handler.CreateURL)
 	r.GET("/:short_path", handler.GetURL)
 	r.POST("/api/shorten", handler.GetURLJSON)
+	r.GET("/ping", handler.Ping)
 
 	return r
 }

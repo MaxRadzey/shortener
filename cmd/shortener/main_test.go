@@ -2,13 +2,15 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
-	"github.com/MaxRadzey/shortener/internal/models"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"github.com/MaxRadzey/shortener/internal/models"
 
 	"github.com/MaxRadzey/shortener/internal/config"
 
@@ -26,6 +28,14 @@ var AppConfig = config.New()
 
 type FakeStorage struct {
 	data map[string]string
+}
+
+type FakeDB struct {
+	err error
+}
+
+func (f *FakeDB) Ping(ctx context.Context) error {
+	return f.err
 }
 
 func (f *FakeStorage) Get(short string) (string, error) {
@@ -325,6 +335,49 @@ func TestGetURLJSON(t *testing.T) {
 
 			require.Equal(t, strings.TrimSpace(test.want.response), strings.TrimSpace(w.Body.String()), "Body не совпадает с ожидаемым")
 			require.Equal(t, test.want.code, w.Code, "Код ответа не совпадает с ожидаемым")
+		})
+	}
+}
+
+func TestPing(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	okHandler := &httphandlers.Handler{
+		Storage:   &FakeStorage{data: map[string]string{}},
+		AppConfig: *AppConfig,
+		DBPool:    &FakeDB{err: nil},
+	}
+	failHandler := &httphandlers.Handler{
+		Storage:   &FakeStorage{data: map[string]string{}},
+		AppConfig: *AppConfig,
+		DBPool:    &FakeDB{err: errors.New("db down")},
+	}
+	noPoolHandler := &httphandlers.Handler{
+		Storage:   &FakeStorage{data: map[string]string{}},
+		AppConfig: *AppConfig,
+		DBPool:    nil,
+	}
+
+	tests := []struct {
+		name    string
+		handler *httphandlers.Handler
+		want    int
+	}{
+		{name: "DB ok", handler: okHandler, want: http.StatusOK},
+		{name: "DB fail", handler: failHandler, want: http.StatusInternalServerError},
+		{name: "No pool", handler: noPoolHandler, want: http.StatusInternalServerError},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			router := app.SetupRouter(tt.handler)
+
+			r := httptest.NewRequest(http.MethodGet, "/ping", nil)
+			w := httptest.NewRecorder()
+
+			router.ServeHTTP(w, r)
+
+			require.Equal(t, tt.want, w.Code)
 		})
 	}
 }

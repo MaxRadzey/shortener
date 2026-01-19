@@ -11,6 +11,7 @@ func ParseFlag(config *config.Config) {
 	flag.StringVar(&config.ReturningAddress, "b", config.ReturningAddress, "address to return URL")
 	flag.StringVar(&config.LogLevel, "l", config.LogLevel, "log level")
 	flag.StringVar(&config.FilePath, "f", config.FilePath, "file path")
+	flag.StringVar(&config.DBConfig.DSN, "d", config.DBConfig.DSN, "database connection string")
 
 	flag.Parse()
 }

@@ -1,20 +1,28 @@
 package handler
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
+
 	"github.com/MaxRadzey/shortener/internal/config"
 	"github.com/MaxRadzey/shortener/internal/models"
 	dbstorage "github.com/MaxRadzey/shortener/internal/storage"
 	"github.com/MaxRadzey/shortener/internal/utils"
 	"github.com/gin-gonic/gin"
-	"io"
-	"net/http"
 )
 
 type Handler struct {
 	Storage   dbstorage.URLStorage
 	AppConfig config.Config
+	DBPool    pingService
+}
+
+// pingService описывает минимальный интерфейс для проверки соединения с БД.
+type pingService interface {
+	Ping(ctx context.Context) error
 }
 
 // CreateURL хэндлер, обрабатывает POST-запросы, принимает текстовый URL в теле запроса,
@@ -98,4 +106,18 @@ func (h *Handler) GetURLJSON(c *gin.Context) {
 		c.String(http.StatusInternalServerError, "Internal server error!")
 		return
 	}
+}
+
+func (h *Handler) Ping(c *gin.Context) {
+	if h.DBPool == nil {
+		c.Status(http.StatusInternalServerError)
+		return
+	}
+	ctx := c.Request.Context()
+	if err := h.DBPool.Ping(ctx); err != nil {
+		c.Status(http.StatusInternalServerError)
+		return
+	}
+
+	c.Status(http.StatusOK)
 }

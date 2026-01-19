@@ -7,6 +7,11 @@ type Config struct {
 	ReturningAddress string
 	LogLevel         string
 	FilePath         string
+	DBConfig         DBConfig
+}
+
+type DBConfig struct {
+	DSN string
 }
 
 func New() *Config {
@@ -15,6 +20,9 @@ func New() *Config {
 		ReturningAddress: "http://localhost:8080",
 		LogLevel:         "info",
 		FilePath:         "data.json",
+		DBConfig: DBConfig{
+			DSN: "postgres://username:password@localhost:5432/database_name",
+		},
 	}
 }
 
@@ -29,6 +37,9 @@ func ParseEnv(config *Config) {
 		config.LogLevel = LogLevel
 	}
 	if FilePath := os.Getenv("FILE_PATH"); FilePath != "" {
-		config.LogLevel = FilePath
+		config.FilePath = FilePath
+	}
+	if DSN := os.Getenv("DATABASE_DSN"); DSN != "" {
+		config.DBConfig.DSN = DSN
 	}
 }
