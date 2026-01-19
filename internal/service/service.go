@@ -1,11 +1,16 @@
 package service
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/MaxRadzey/shortener/internal/config"
 	dbstorage "github.com/MaxRadzey/shortener/internal/storage"
 	"github.com/MaxRadzey/shortener/internal/utils"
+)
+
+var (
+	ErrValidation = errors.New("validation error")
 )
 
 type Service struct {
@@ -21,6 +26,31 @@ func NewService(storage dbstorage.URLStorage, appConfig config.Config) *Service 
 }
 
 func (s *Service) CreateShortURL(longURL string) (string, error) {
+	// Проверка валидности URL для text/plain запросов
+	if !utils.IsValidURL(longURL) {
+		return "", ErrValidation
+	}
+
+	shortPath, err := utils.GetShortPath(longURL)
+	if err != nil {
+		return "", fmt.Errorf("failed to generate short path: %w", err)
+	}
+
+	err = s.storage.Create(shortPath, longURL)
+	if err != nil {
+		return "", fmt.Errorf("failed to save URL: %w", err)
+	}
+
+	result := fmt.Sprintf("%s/%s", s.appConfig.ReturningAddress, shortPath)
+	return result, nil
+}
+
+func (s *Service) CreateShortURLJSON(longURL string) (string, error) {
+	// Проверка на пустоту для JSON запросов (без валидации URL)
+	if longURL == "" {
+		return "", ErrValidation
+	}
+
 	shortPath, err := utils.GetShortPath(longURL)
 	if err != nil {
 		return "", fmt.Errorf("failed to generate short path: %w", err)

@@ -2,12 +2,12 @@ package handler
 
 import (
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 
 	"github.com/MaxRadzey/shortener/internal/models"
 	"github.com/MaxRadzey/shortener/internal/service"
-	"github.com/MaxRadzey/shortener/internal/utils"
 	"github.com/gin-gonic/gin"
 )
 
@@ -26,13 +26,12 @@ func (h *Handler) CreateURL(c *gin.Context) {
 	}
 
 	text := string(body)
-	if !utils.IsValidURL(text) {
-		c.String(http.StatusBadRequest, "Invalid Body!")
-		return
-	}
-
 	result, err := h.Service.CreateShortURL(text)
 	if err != nil {
+		if errors.Is(err, service.ErrValidation) {
+			c.String(http.StatusBadRequest, "Invalid Body!")
+			return
+		}
 		c.String(http.StatusInternalServerError, "Internal server error!")
 		return
 	}
@@ -63,14 +62,13 @@ func (h *Handler) GetURLJSON(c *gin.Context) {
 		return
 	}
 
-	if req.URL == "" {
-		c.String(http.StatusBadRequest, "invalid request")
-		return
-	}
-
-	result, err := h.Service.CreateShortURL(req.URL)
+	result, err := h.Service.CreateShortURLJSON(req.URL)
 	if err != nil {
-		c.String(http.StatusBadRequest, "invalid request")
+		if errors.Is(err, service.ErrValidation) {
+			c.String(http.StatusBadRequest, "invalid request")
+			return
+		}
+		c.String(http.StatusInternalServerError, "Internal server error!")
 		return
 	}
 
