@@ -278,11 +278,11 @@ func TestGetURLJSON(t *testing.T) {
 		{
 			name:        "Test #2 Ok",
 			method:      http.MethodPost,
-			request:     models.Request{URL: "vk.com"},
+			request:     models.Request{URL: "https://vk.com"},
 			contentType: "application/json",
 			want: want{
 				code:     http.StatusCreated,
-				response: `{"result":"http://localhost:8080/SJQ4fi"}`,
+				response: `{"result":"http://localhost:8080/XxLlqM"}`,
 			},
 		},
 		{

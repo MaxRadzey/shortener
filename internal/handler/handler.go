@@ -26,6 +26,7 @@ func (h *Handler) CreateURL(c *gin.Context) {
 	}
 
 	text := string(body)
+
 	result, err := h.Service.CreateShortURL(text)
 	if err != nil {
 		if errors.Is(err, service.ErrValidation) {
@@ -62,7 +63,7 @@ func (h *Handler) GetURLJSON(c *gin.Context) {
 		return
 	}
 
-	result, err := h.Service.CreateShortURLJSON(req.URL)
+	result, err := h.Service.CreateShortURL(req.URL)
 	if err != nil {
 		if errors.Is(err, service.ErrValidation) {
 			c.String(http.StatusBadRequest, "invalid request")
