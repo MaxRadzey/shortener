@@ -110,7 +110,7 @@ func TestGetURL(t *testing.T) {
 		},
 	}
 
-	urlService := service.NewService(storage, *AppConfig)
+	urlService := service.NewService(storage, *AppConfig, nil)
 	handler := &httphandlers.Handler{Service: urlService}
 
 	type want struct {
@@ -178,7 +178,7 @@ func TestCreateURL(t *testing.T) {
 		data: map[string]string{},
 	}
 
-	urlService := service.NewService(storage, *AppConfig)
+	urlService := service.NewService(storage, *AppConfig, nil)
 	handler := &httphandlers.Handler{Service: urlService}
 
 	type want struct {
@@ -255,7 +255,7 @@ func TestGetURLJSON(t *testing.T) {
 		response string
 	}
 
-	urlService := service.NewService(storage, *AppConfig)
+	urlService := service.NewService(storage, *AppConfig, nil)
 	handler := &httphandlers.Handler{Service: urlService}
 
 	tests := []struct {

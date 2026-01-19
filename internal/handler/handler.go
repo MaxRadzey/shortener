@@ -83,3 +83,15 @@ func (h *Handler) GetURLJSON(c *gin.Context) {
 		return
 	}
 }
+
+// Ping хендлер проверяет соединение с базой данных.
+// Возвращает HTTP 200 OK при успешной проверке, 500 Internal Server Error при неуспешной.
+func (h *Handler) Ping(c *gin.Context) {
+	ctx := c.Request.Context()
+	if err := h.Service.Ping(ctx); err != nil {
+		c.String(http.StatusInternalServerError, "Database connection failed")
+		return
+	}
+
+	c.String(http.StatusOK, "OK")
+}

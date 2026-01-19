@@ -1,12 +1,14 @@
 package service
 
 import (
+	"context"
 	"errors"
 	"fmt"
 
 	"github.com/MaxRadzey/shortener/internal/config"
 	dbstorage "github.com/MaxRadzey/shortener/internal/storage"
 	"github.com/MaxRadzey/shortener/internal/utils"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 var (
@@ -16,12 +18,14 @@ var (
 type Service struct {
 	storage   dbstorage.URLStorage
 	appConfig config.Config
+	db        *pgxpool.Pool
 }
 
-func NewService(storage dbstorage.URLStorage, appConfig config.Config) *Service {
+func NewService(storage dbstorage.URLStorage, appConfig config.Config, db *pgxpool.Pool) *Service {
 	return &Service{
 		storage:   storage,
 		appConfig: appConfig,
+		db:        db,
 	}
 }
 
@@ -51,4 +55,13 @@ func (s *Service) GetLongURL(shortPath string) (string, error) {
 	}
 
 	return longURL, nil
+}
+
+// Ping проверяет соединение с базой данных.
+// Возвращает ошибку, если БД недоступна или соединение не установлено.
+func (s *Service) Ping(ctx context.Context) error {
+	if s.db == nil {
+		return errors.New("database connection not available")
+	}
+	return s.db.Ping(ctx)
 }
