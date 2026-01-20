@@ -33,7 +33,7 @@ func Run(AppConfig *config.Config) error {
 
 	r := SetupRouter(handler)
 
-	logger.Log.Info("starting HTTP server", zap.String("address", AppConfig.Address))
+	logger.Log.Info("Starting HTTP server", zap.String("address", AppConfig.Address))
 	return r.Run(AppConfig.Address)
 }
 
@@ -52,12 +52,11 @@ func initializeStorage(AppConfig *config.Config) (dbstorage.URLStorage, *pgxpool
 		logger.Log.Info("Attempting to connect to PostgreSQL", zap.String("dsn", utils.MaskDSN(AppConfig.DatabaseDSN)))
 		db, err = initDatabase(AppConfig.DatabaseDSN)
 		if err == nil && db != nil {
-			logger.Log.Info("PostgreSQL connection established, running migrations")
 			// Запустить миграции используя тот же DSN
 			if err := migrations.Run(AppConfig.DatabaseDSN); err != nil {
-				logger.Log.Warn("migrations failed", zap.Error(err))
+				logger.Log.Warn("Migrations failed", zap.Error(err))
 			} else {
-				logger.Log.Info("migrations completed successfully")
+				logger.Log.Info("Migrations completed successfully")
 			}
 
 			postgresStorage, err := dbstorage.NewPostgresStorage(db)
@@ -107,26 +106,18 @@ func initializeStorage(AppConfig *config.Config) (dbstorage.URLStorage, *pgxpool
 // Возвращает пул соединений или nil, если DSN не указан или подключение не удалось.
 func initDatabase(dsn string) (*pgxpool.Pool, error) {
 	if dsn == "" {
-		logger.Log.Debug("database DSN is empty, skipping PostgreSQL connection")
+		logger.Log.Debug("Database DSN is empty, skipping PostgreSQL connection")
 		return nil, nil
 	}
 
-	logger.Log.Debug("creating PostgreSQL connection pool")
+	logger.Log.Debug("Creating PostgreSQL connection pool")
 	db, err := pgxpool.New(context.Background(), dsn)
 	if err != nil {
-		logger.Log.Warn("failed to create connection pool", zap.Error(err))
+		logger.Log.Warn("Failed to create connection pool", zap.Error(err))
 		return nil, nil
 	}
 
-	logger.Log.Debug("checking database connection with ping")
-	ctx := context.Background()
-	if err := db.Ping(ctx); err != nil {
-		logger.Log.Warn("database ping failed", zap.Error(err))
-		db.Close()
-		return nil, nil
-	}
-
-	logger.Log.Info("database connection successful")
+	logger.Log.Info("Database connection successful")
 	return db, nil
 }
 

@@ -23,34 +23,27 @@ func Run(dsn string) error {
 		return nil
 	}
 
-	logger.Log.Info("starting database migrations")
+	logger.Log.Info("Starting database migrations")
 
 	// Получаем абсолютный путь к директории migrations
 	migrationsPath, err := filepath.Abs("migrations")
 	if err != nil {
-		logger.Log.Error("failed to get migrations path", zap.Error(err))
+		logger.Log.Error("Failed to get migrations path", zap.Error(err))
 		return fmt.Errorf("failed to get migrations path: %w", err)
 	}
-	logger.Log.Debug("migrations path", zap.String("path", migrationsPath))
+	logger.Log.Debug("Migrations path", zap.String("path", migrationsPath))
 
 	db, err := sql.Open("pgx", dsn)
 	if err != nil {
-		logger.Log.Error("failed to open database for migrations", zap.Error(err))
+		logger.Log.Error("Failed to open database for migrations", zap.Error(err))
 		return fmt.Errorf("failed to open database: %w", err)
 	}
 	defer db.Close()
 
-	// Проверяем соединение
-	logger.Log.Debug("pinging database for migrations")
-	if err := db.Ping(); err != nil {
-		logger.Log.Error("failed to ping database for migrations", zap.Error(err))
-		return fmt.Errorf("failed to ping database: %w", err)
-	}
-
 	// Создаем экземпляр драйвера PostgreSQL для миграций
 	instance, err := postgres.WithInstance(db, &postgres.Config{})
 	if err != nil {
-		logger.Log.Error("failed to create postgres instance for migrations", zap.Error(err))
+		logger.Log.Error("Failed to create postgres instance for migrations", zap.Error(err))
 		return fmt.Errorf("failed to create postgres instance: %w", err)
 	}
 
@@ -59,22 +52,22 @@ func Run(dsn string) error {
 		fmt.Sprintf("file://%s", migrationsPath),
 		"postgres", instance)
 	if err != nil {
-		logger.Log.Error("failed to create migrate instance", zap.Error(err))
+		logger.Log.Error("Failed to create migrate instance", zap.Error(err))
 		return fmt.Errorf("failed to create migrate instance: %w", err)
 	}
 
 	// Запускаем миграции
-	logger.Log.Info("running migrations")
+	logger.Log.Info("Running migrations")
 	err = m.Up()
 	if err != nil && !errors.Is(err, migrate.ErrNoChange) {
-		logger.Log.Error("migrations failed", zap.Error(err))
+		logger.Log.Error("Migrations failed", zap.Error(err))
 		return fmt.Errorf("failed to run migrations: %w", err)
 	}
 
 	if errors.Is(err, migrate.ErrNoChange) {
-		logger.Log.Info("migrations already applied, no changes needed")
+		logger.Log.Info("Migrations already applied, no changes needed")
 	} else {
-		logger.Log.Info("migrations completed successfully")
+		logger.Log.Info("Migrations completed successfully")
 	}
 
 	return nil
