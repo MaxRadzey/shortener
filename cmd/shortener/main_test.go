@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -40,6 +41,13 @@ func (f *FakeStorage) Get(short string) (string, error) {
 
 func (f *FakeStorage) Create(short, full string) error {
 	f.data[short] = full
+	return nil
+}
+
+func (f *FakeStorage) CreateBatch(ctx context.Context, items []dbstorage.BatchItem) error {
+	for _, item := range items {
+		f.data[item.ShortPath] = item.FullURL
+	}
 	return nil
 }
 

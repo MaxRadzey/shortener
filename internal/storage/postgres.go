@@ -54,3 +54,36 @@ func (p *PostgresStorage) Create(short, full string) error {
 
 	return nil
 }
+
+func (p *PostgresStorage) CreateBatch(ctx context.Context, items []BatchItem) error {
+	// Используем транзакцию для атомарности
+	tx, err := p.db.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	// Подготавливаем batch insert с множественными VALUES
+	batch := &pgx.Batch{}
+	for _, item := range items {
+		batch.Queue("INSERT INTO urls (short_path, original_url) VALUES ($1, $2) ON CONFLICT (short_path) DO NOTHING", item.ShortPath, item.FullURL)
+	}
+
+	results := tx.SendBatch(ctx, batch)
+	defer results.Close()
+
+	// Выполняем все запросы
+	for i := 0; i < len(items); i++ {
+		_, err := results.Exec()
+		if err != nil {
+			return fmt.Errorf("failed to insert batch item: %w", err)
+		}
+	}
+
+	// Коммитим транзакцию
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("failed to commit transaction: %w", err)
+	}
+
+	return nil
+}

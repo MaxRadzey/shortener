@@ -140,6 +140,7 @@ func SetupRouter(handler *httphandlers.Handler) *gin.Engine {
 	r.POST("/", handler.CreateURL)
 	r.GET("/:short_path", handler.GetURL)
 	r.POST("/api/shorten", handler.GetURLJSON)
+	r.POST("/api/shorten/batch", handler.CreateURLBatch)
 	r.GET("/ping", handler.Ping)
 
 	return r

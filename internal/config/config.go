@@ -16,6 +16,7 @@ func New() *Config {
 		ReturningAddress: "http://localhost:8080",
 		LogLevel:         "info",
 		FilePath:         "data.json",
+		DatabaseDSN:      "postgres://shortener:shortener@localhost:5432/shortener",
 	}
 }
 

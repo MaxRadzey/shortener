@@ -95,3 +95,39 @@ func (h *Handler) Ping(c *gin.Context) {
 
 	c.String(http.StatusOK, "OK")
 }
+
+// CreateURLBatch хендлер обрабатывает POST-запросы,
+// принимает массив объектов с correlation_id и original_url,
+// создает короткие URL для всех URL и возвращает массив объектов с correlation_id и short_url.
+func (h *Handler) CreateURLBatch(c *gin.Context) {
+	var reqItems []models.BatchRequestItem
+
+	if err := json.NewDecoder(c.Request.Body).Decode(&reqItems); err != nil {
+		c.String(http.StatusBadRequest, "invalid request")
+		return
+	}
+
+	if len(reqItems) == 0 {
+		c.String(http.StatusBadRequest, "invalid request")
+		return
+	}
+
+	ctx := c.Request.Context()
+	responseItems, err := h.Service.CreateShortURLBatch(ctx, reqItems)
+	if err != nil {
+		if errors.Is(err, service.ErrValidation) {
+			c.String(http.StatusBadRequest, "invalid request")
+			return
+		}
+		c.String(http.StatusInternalServerError, "Internal server error!")
+		return
+	}
+
+	c.Writer.Header().Set("Content-Type", "application/json")
+	c.Writer.WriteHeader(http.StatusCreated)
+
+	if err := json.NewEncoder(c.Writer).Encode(responseItems); err != nil {
+		c.String(http.StatusInternalServerError, "Internal server error!")
+		return
+	}
+}

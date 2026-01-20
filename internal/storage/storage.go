@@ -2,6 +2,7 @@ package storage
 
 import (
 	"bufio"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -11,9 +12,15 @@ import (
 
 var ErrNotFound = errors.New("url not found")
 
+type BatchItem struct {
+	ShortPath string
+	FullURL   string
+}
+
 type URLStorage interface {
 	Get(short string) (string, error)
 	Create(short, full string) error
+	CreateBatch(ctx context.Context, items []BatchItem) error
 }
 
 type Storage struct {
@@ -104,4 +111,39 @@ func (s *Storage) Get(id string) (string, error) {
 	}
 
 	return url, nil
+}
+
+func (s *Storage) CreateBatch(ctx context.Context, items []BatchItem) error {
+	s.mu.Lock()
+	// Обновляем data map атомарно
+	for _, item := range items {
+		s.data[item.ShortPath] = item.FullURL
+	}
+	dataCopy := make(map[string]string)
+	for k, v := range s.data {
+		dataCopy[k] = v
+	}
+	s.mu.Unlock()
+
+	// Записываем весь файл за одну операцию
+	file, err := os.OpenFile(s.filePath, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0755)
+	if err != nil {
+		return fmt.Errorf("open file error: %w", err)
+	}
+
+	defer func(file *os.File) {
+		_ = file.Close()
+	}(file)
+
+	data, err := json.Marshal(dataCopy)
+	if err != nil {
+		return fmt.Errorf("serialize url error: %w", err)
+	}
+
+	_, err = file.WriteString(string(data))
+	if err != nil {
+		return fmt.Errorf("write url to file error: %w", err)
+	}
+
+	return nil
 }
