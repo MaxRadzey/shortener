@@ -23,6 +23,10 @@ type Storage struct {
 }
 
 func NewStorage(filePath string) (*Storage, error) {
+	if filePath == "" {
+		return nil, fmt.Errorf("file path cannot be empty")
+	}
+
 	data, err := readLines(filePath)
 	if err != nil {
 		return nil, fmt.Errorf("read urls from file error: %w", err)

@@ -1,9 +1,10 @@
 package logger
 
 import (
+	"time"
+
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
-	"time"
 )
 
 var Log *zap.Logger = zap.NewNop()
@@ -37,7 +38,7 @@ func Initialize(level string) error {
 		return err
 	}
 
-	cfg := zap.NewProductionConfig()
+	cfg := zap.NewDevelopmentConfig()
 	cfg.Level = lvl
 
 	zl, err := cfg.Build()
