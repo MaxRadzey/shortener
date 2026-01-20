@@ -1,6 +1,9 @@
 package config
 
-import "os"
+import (
+	"flag"
+	"os"
+)
 
 type Config struct {
 	Address          string
@@ -36,4 +39,16 @@ func ParseEnv(config *Config) {
 	if DatabaseDSN := os.Getenv("DATABASE_DSN"); DatabaseDSN != "" {
 		config.DatabaseDSN = DatabaseDSN
 	}
+}
+
+// ParseFlags парсит флаги командной строки и обновляет конфигурацию.
+// Флаги имеют приоритет над переменными окружения.
+func ParseFlags(config *Config) {
+	flag.StringVar(&config.Address, "a", config.Address, "address and port to run server")
+	flag.StringVar(&config.ReturningAddress, "b", config.ReturningAddress, "address to return URL")
+	flag.StringVar(&config.LogLevel, "l", config.LogLevel, "log level")
+	flag.StringVar(&config.FilePath, "f", config.FilePath, "file path")
+	flag.StringVar(&config.DatabaseDSN, "d", config.DatabaseDSN, "database connection string")
+
+	flag.Parse()
 }

@@ -2,7 +2,6 @@ package main
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -10,116 +9,17 @@ import (
 	"testing"
 
 	"github.com/MaxRadzey/shortener/internal/models"
-
-	"github.com/MaxRadzey/shortener/internal/config"
-
-	"github.com/MaxRadzey/shortener/internal/app"
-	"github.com/gin-gonic/gin"
-
-	"github.com/MaxRadzey/shortener/internal/utils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	httphandlers "github.com/MaxRadzey/shortener/internal/handler"
-	"github.com/MaxRadzey/shortener/internal/service"
-	dbstorage "github.com/MaxRadzey/shortener/internal/storage"
 )
 
-var AppConfig = config.New()
-
-type FakeStorage struct {
-	data map[string]string
-}
-
-func (f *FakeStorage) Get(short string) (string, error) {
-	val, ok := f.data[short]
-	if !ok {
-		return "", dbstorage.ErrNotFound
-	}
-	return val, nil
-}
-
-func (f *FakeStorage) Create(short, full string) error {
-	f.data[short] = full
-	return nil
-}
-
-func (f *FakeStorage) CreateBatch(ctx context.Context, items []dbstorage.BatchItem) error {
-	for _, item := range items {
-		f.data[item.ShortPath] = item.FullURL
-	}
-	return nil
-}
-
-func TestGetShortPath(t *testing.T) {
-	tests := []struct {
-		name    string
-		value   string
-		want    string
-		wantErr bool
-	}{
-		{
-			name:    "Test get short value of URL",
-			value:   "https://vk.com",
-			want:    "XxLlqM",
-			wantErr: false,
-		},
-		{
-			name:    "Test get short value of URL",
-			value:   "",
-			want:    "",
-			wantErr: true,
-		},
-	}
-
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			value, err := utils.GetShortPath(test.value)
-			if !test.wantErr {
-				require.NoError(t, err)
-				assert.Equal(t, test.want, value)
-				return
-			}
-			assert.Error(t, err)
-		})
-	}
-}
-
-func TestIsValidURL(t *testing.T) {
-	tests := []struct {
-		name     string
-		inputURL string
-		want     bool
-	}{
-		{
-			name:     "Valid URL",
-			inputURL: "https://vk.ccom",
-			want:     true,
-		},
-		{
-			name:     "Invalid URL",
-			inputURL: "123",
-			want:     false,
-		},
-	}
-
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			result := utils.IsValidURL(test.inputURL)
-			assert.Equal(t, result, test.want)
-		})
-	}
-}
-
 func TestGetURL(t *testing.T) {
-	storage := &FakeStorage{
-		data: map[string]string{
-			"XxLlqM": "https://vk.com",
-		},
-	}
+	storage := newFakeStorage(map[string]string{
+		"XxLlqM": "https://vk.com",
+	})
 
-	urlService := service.NewService(storage, *AppConfig, nil)
-	handler := &httphandlers.Handler{Service: urlService}
+	handler := setupTestHandler(storage)
+	router := setupTestRouter(handler)
 
 	type want struct {
 		code     int
@@ -163,10 +63,6 @@ func TestGetURL(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			gin.SetMode(gin.TestMode)
-
-			router := app.SetupRouter(handler)
-
 			r := httptest.NewRequest(test.method, "/"+test.request, nil)
 			w := httptest.NewRecorder()
 
@@ -182,12 +78,9 @@ func TestGetURL(t *testing.T) {
 }
 
 func TestCreateURL(t *testing.T) {
-	storage := &FakeStorage{
-		data: map[string]string{},
-	}
-
-	urlService := service.NewService(storage, *AppConfig, nil)
-	handler := &httphandlers.Handler{Service: urlService}
+	storage := newFakeStorage(nil)
+	handler := setupTestHandler(storage)
+	router := setupTestRouter(handler)
 
 	type want struct {
 		code     int
@@ -235,10 +128,6 @@ func TestCreateURL(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			gin.SetMode(gin.TestMode)
-
-			router := app.SetupRouter(handler)
-
 			requestBody := strings.NewReader(test.body)
 
 			r := httptest.NewRequest(test.method, "/", requestBody)
@@ -254,17 +143,14 @@ func TestCreateURL(t *testing.T) {
 }
 
 func TestGetURLJSON(t *testing.T) {
-	storage := &FakeStorage{
-		data: map[string]string{},
-	}
+	storage := newFakeStorage(nil)
+	handler := setupTestHandler(storage)
+	router := setupTestRouter(handler)
 
 	type want struct {
 		code     int
 		response string
 	}
-
-	urlService := service.NewService(storage, *AppConfig, nil)
-	handler := &httphandlers.Handler{Service: urlService}
 
 	tests := []struct {
 		name        string
@@ -317,10 +203,6 @@ func TestGetURLJSON(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			gin.SetMode(gin.TestMode)
-
-			router := app.SetupRouter(handler)
-
 			var requestBody *bytes.Reader
 			switch v := test.request.(type) {
 			case models.Request:
@@ -343,12 +225,9 @@ func TestGetURLJSON(t *testing.T) {
 }
 
 func TestCreateURLBatch(t *testing.T) {
-	storage := &FakeStorage{
-		data: map[string]string{},
-	}
-
-	urlService := service.NewService(storage, *AppConfig, nil)
-	handler := &httphandlers.Handler{Service: urlService}
+	storage := newFakeStorage(nil)
+	handler := setupTestHandler(storage)
+	router := setupTestRouter(handler)
 
 	type want struct {
 		code        int
@@ -442,10 +321,6 @@ func TestCreateURLBatch(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			gin.SetMode(gin.TestMode)
-
-			router := app.SetupRouter(handler)
-
 			var requestBody *bytes.Reader
 			switch v := test.request.(type) {
 			case []models.BatchRequestItem:
@@ -492,10 +367,4 @@ func TestCreateURLBatch(t *testing.T) {
 			}
 		})
 	}
-}
-
-// getShortPathForURL возвращает короткий путь для URL (для тестов)
-func getShortPathForURL(url string) string {
-	path, _ := utils.GetShortPath(url)
-	return path
 }

@@ -1,4 +1,4 @@
-package migrations
+package storage
 
 import (
 	"database/sql"
@@ -14,11 +14,11 @@ import (
 	"go.uber.org/zap"
 )
 
-// Run запускает миграции базы данных из директории migrations.
+// RunMigrations запускает миграции базы данных из директории migrations.
 // Принимает DSN строку подключения и создает временное подключение через *sql.DB,
 // необходимое для golang-migrate (библиотека не поддерживает pgxpool напрямую).
 // Если миграции уже применены, функция возвращает nil.
-func Run(dsn string) error {
+func RunMigrations(dsn string) error {
 	if dsn == "" {
 		return nil
 	}

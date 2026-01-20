@@ -1,11 +1,12 @@
-package gzip
+package middleware
 
 import (
 	"compress/gzip"
-	"github.com/gin-gonic/gin"
 	"log"
 	"net/http"
 	"strings"
+
+	"github.com/gin-gonic/gin"
 )
 
 type compressWriter struct {
@@ -25,9 +26,9 @@ func (c *compressWriter) WriteString(s string) (int, error) {
 	return c.Writer.Write([]byte(s))
 }
 
-func GzipMiddleware() gin.HandlerFunc {
+// Gzip обрабатывает сжатие и распаковку gzip для HTTP запросов и ответов.
+func Gzip() gin.HandlerFunc {
 	return func(c *gin.Context) {
-
 		acceptEncoding := c.GetHeader("Accept-Encoding")
 		log.Printf("[GzipMiddleware] Accept-Encoding: %s", acceptEncoding)
 		supportGzip := strings.Contains(acceptEncoding, "gzip")
@@ -39,7 +40,6 @@ func GzipMiddleware() gin.HandlerFunc {
 					log.Printf("[GzipMiddleware] Error closing gzip writer: %v", err)
 				}
 			}()
-			//defer gz.Close()
 			c.Writer = &compressWriter{Writer: gz, ResponseWriter: c.Writer}
 			c.Header("Content-Encoding", "gzip")
 		}
@@ -60,7 +60,6 @@ func GzipMiddleware() gin.HandlerFunc {
 					log.Printf("[GzipMiddleware] Error closing gzip reader: %v", err)
 				}
 			}()
-			//defer reader.Close()
 			c.Request.Body = reader
 		}
 		c.Next()
