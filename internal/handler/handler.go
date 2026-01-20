@@ -6,9 +6,11 @@ import (
 	"io"
 	"net/http"
 
+	"github.com/MaxRadzey/shortener/internal/logger"
 	"github.com/MaxRadzey/shortener/internal/models"
 	"github.com/MaxRadzey/shortener/internal/service"
 	"github.com/gin-gonic/gin"
+	"go.uber.org/zap"
 )
 
 type Handler struct {
@@ -21,6 +23,7 @@ type Handler struct {
 func (h *Handler) CreateURL(c *gin.Context) {
 	body, err := io.ReadAll(c.Request.Body)
 	if err != nil {
+		logger.Log.Error("Failed to create URL", zap.Error(err))
 		c.String(http.StatusInternalServerError, "Error occurred while reading body!")
 		return
 	}
@@ -33,6 +36,7 @@ func (h *Handler) CreateURL(c *gin.Context) {
 			c.String(http.StatusBadRequest, "Invalid Body!")
 			return
 		}
+		logger.Log.Error("Failed to create URL", zap.Error(err))
 		c.String(http.StatusInternalServerError, "Internal server error!")
 		return
 	}
@@ -69,6 +73,7 @@ func (h *Handler) GetURLJSON(c *gin.Context) {
 			c.String(http.StatusBadRequest, "invalid request")
 			return
 		}
+		logger.Log.Error("Failed to get URL", zap.Error(err))
 		c.String(http.StatusInternalServerError, "Internal server error!")
 		return
 	}
@@ -79,6 +84,7 @@ func (h *Handler) GetURLJSON(c *gin.Context) {
 	c.Writer.WriteHeader(http.StatusCreated)
 
 	if err := json.NewEncoder(c.Writer).Encode(resp); err != nil {
+		logger.Log.Error("Failed to get URL", zap.Error(err))
 		c.String(http.StatusInternalServerError, "Internal server error!")
 		return
 	}
@@ -89,6 +95,7 @@ func (h *Handler) GetURLJSON(c *gin.Context) {
 func (h *Handler) Ping(c *gin.Context) {
 	ctx := c.Request.Context()
 	if err := h.Service.Ping(ctx); err != nil {
+		logger.Log.Error("Failed to ping database", zap.Error(err))
 		c.String(http.StatusInternalServerError, "Database connection failed")
 		return
 	}
@@ -119,6 +126,7 @@ func (h *Handler) CreateURLBatch(c *gin.Context) {
 			c.String(http.StatusBadRequest, "invalid request")
 			return
 		}
+		logger.Log.Error("Failed to create batch URLs", zap.Error(err))
 		c.String(http.StatusInternalServerError, "Internal server error!")
 		return
 	}
@@ -127,6 +135,7 @@ func (h *Handler) CreateURLBatch(c *gin.Context) {
 	c.Writer.WriteHeader(http.StatusCreated)
 
 	if err := json.NewEncoder(c.Writer).Encode(responseItems); err != nil {
+		logger.Log.Error("Failed to create batch URLs", zap.Error(err))
 		c.String(http.StatusInternalServerError, "Internal server error!")
 		return
 	}

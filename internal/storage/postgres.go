@@ -61,7 +61,6 @@ func (p *PostgresStorage) CreateBatch(ctx context.Context, items []BatchItem) er
 	if err != nil {
 		return fmt.Errorf("failed to begin transaction: %w", err)
 	}
-	defer tx.Rollback(ctx)
 
 	// Подготавливаем batch insert с множественными VALUES
 	batch := &pgx.Batch{}
@@ -70,17 +69,22 @@ func (p *PostgresStorage) CreateBatch(ctx context.Context, items []BatchItem) er
 	}
 
 	results := tx.SendBatch(ctx, batch)
-	defer results.Close()
 
 	// Выполняем все запросы
 	for i := 0; i < len(items); i++ {
 		_, err := results.Exec()
 		if err != nil {
+			results.Close()
+			tx.Rollback(ctx)
 			return fmt.Errorf("failed to insert batch item: %w", err)
 		}
 	}
 
-	// Коммитим транзакцию
+	if err := results.Close(); err != nil {
+		tx.Rollback(ctx)
+		return fmt.Errorf("failed to close batch results: %w", err)
+	}
+
 	if err := tx.Commit(ctx); err != nil {
 		return fmt.Errorf("failed to commit transaction: %w", err)
 	}
