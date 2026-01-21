@@ -12,19 +12,6 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-var (
-	ErrValidation = errors.New("validation error")
-)
-
-// ErrURLConflict представляет ошибку конфликта URL с уже существующим сокращённым URL
-type ErrURLConflict struct {
-	ShortURL string
-}
-
-func (e *ErrURLConflict) Error() string {
-	return fmt.Sprintf("url already exists: %s", e.ShortURL)
-}
-
 type Service struct {
 	storage   dbstorage.URLStorage
 	appConfig config.Config
@@ -41,7 +28,7 @@ func NewService(storage dbstorage.URLStorage, appConfig config.Config, db *pgxpo
 
 func (s *Service) CreateShortURL(longURL string) (string, error) {
 	if !utils.IsValidURL(longURL) {
-		return "", ErrValidation
+		return "", &ErrValidation{URL: longURL}
 	}
 
 	shortPath, err := utils.GetShortPath(longURL)
@@ -91,7 +78,7 @@ func (s *Service) CreateShortURLBatch(ctx context.Context, items []models.BatchR
 
 	for _, item := range items {
 		if !utils.IsValidURL(item.OriginalURL) {
-			return nil, ErrValidation
+			return nil, &ErrValidation{URL: item.OriginalURL}
 		}
 
 		shortPath, err := utils.GetShortPath(item.OriginalURL)

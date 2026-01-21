@@ -42,7 +42,8 @@ func (h *Handler) CreateURL(c *gin.Context) {
 
 	result, err := h.Service.CreateShortURL(text)
 	if err != nil {
-		if errors.Is(err, service.ErrValidation) {
+		var validationErr *service.ErrValidation
+		if errors.As(err, &validationErr) {
 			c.String(http.StatusBadRequest, "Invalid Body!")
 			return
 		}
@@ -86,7 +87,8 @@ func (h *Handler) GetURLJSON(c *gin.Context) {
 
 	result, err := h.Service.CreateShortURL(req.URL)
 	if err != nil {
-		if errors.Is(err, service.ErrValidation) {
+		var validationErr *service.ErrValidation
+		if errors.As(err, &validationErr) {
 			c.String(http.StatusBadRequest, "invalid request")
 			return
 		}
@@ -138,7 +140,8 @@ func (h *Handler) CreateURLBatch(c *gin.Context) {
 	ctx := c.Request.Context()
 	responseItems, err := h.Service.CreateShortURLBatch(ctx, reqItems)
 	if err != nil {
-		if errors.Is(err, service.ErrValidation) {
+		var validationErr *service.ErrValidation
+		if errors.As(err, &validationErr) {
 			c.String(http.StatusBadRequest, "invalid request")
 			return
 		}
