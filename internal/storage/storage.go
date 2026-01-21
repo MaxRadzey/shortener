@@ -12,6 +12,15 @@ import (
 
 var ErrNotFound = errors.New("url not found")
 
+// ErrURLAlreadyExists представляет ошибку, когда URL уже существует в базе данных
+type ErrURLAlreadyExists struct {
+	ShortPath string
+}
+
+func (e *ErrURLAlreadyExists) Error() string {
+	return fmt.Sprintf("url already exists with short_path: %s", e.ShortPath)
+}
+
 type BatchItem struct {
 	ShortPath string
 	FullURL   string

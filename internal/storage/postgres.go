@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -47,8 +48,19 @@ func (p *PostgresStorage) Get(short string) (string, error) {
 func (p *PostgresStorage) Create(short, full string) error {
 	ctx := context.Background()
 
-	_, err := p.db.Exec(ctx, "INSERT INTO urls (short_path, original_url) VALUES ($1, $2) ON CONFLICT (short_path) DO NOTHING", short, full)
+	_, err := p.db.Exec(ctx, "INSERT INTO urls (short_path, original_url) VALUES ($1, $2)", short, full)
 	if err != nil {
+		// Проверяем, является ли ошибка нарушением уникального ограничения на original_url
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+			// Получаем существующий short_path для данного original_url
+			var existingShortPath string
+			queryErr := p.db.QueryRow(ctx, "SELECT short_path FROM urls WHERE original_url = $1", full).Scan(&existingShortPath)
+			if queryErr != nil {
+				return fmt.Errorf("failed to get existing short_path: %w", queryErr)
+			}
+			return &ErrURLAlreadyExists{ShortPath: existingShortPath}
+		}
 		return fmt.Errorf("failed to create URL: %w", err)
 	}
 

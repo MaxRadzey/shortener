@@ -16,6 +16,15 @@ var (
 	ErrValidation = errors.New("validation error")
 )
 
+// ErrURLConflict представляет ошибку конфликта URL с уже существующим сокращённым URL
+type ErrURLConflict struct {
+	ShortURL string
+}
+
+func (e *ErrURLConflict) Error() string {
+	return fmt.Sprintf("url already exists: %s", e.ShortURL)
+}
+
 type Service struct {
 	storage   dbstorage.URLStorage
 	appConfig config.Config
@@ -42,6 +51,13 @@ func (s *Service) CreateShortURL(longURL string) (string, error) {
 
 	err = s.storage.Create(shortPath, longURL)
 	if err != nil {
+		// Проверяем, является ли ошибка конфликтом существующего URL
+		var urlExistsErr *dbstorage.ErrURLAlreadyExists
+		if errors.As(err, &urlExistsErr) {
+			// Формируем полный URL для существующего short_path
+			existingURL := fmt.Sprintf("%s/%s", s.appConfig.ReturningAddress, urlExistsErr.ShortPath)
+			return existingURL, &ErrURLConflict{ShortURL: existingURL}
+		}
 		return "", fmt.Errorf("failed to save URL: %w", err)
 	}
 

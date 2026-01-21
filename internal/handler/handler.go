@@ -17,6 +17,16 @@ type Handler struct {
 	Service *service.Service
 }
 
+// sendJSONResponse отправляет JSON ответ и обрабатывает ошибки кодирования
+func (h *Handler) sendJSONResponse(c *gin.Context, statusCode int, data interface{}) {
+	c.Writer.Header().Set("Content-Type", "application/json")
+	c.Writer.WriteHeader(statusCode)
+	if err := json.NewEncoder(c.Writer).Encode(data); err != nil {
+		logger.Log.Error("Failed to encode JSON response", zap.Error(err))
+		c.String(http.StatusInternalServerError, "Internal server error!")
+	}
+}
+
 // CreateURL хэндлер, обрабатывает POST-запросы, принимает текстовый URL в теле запроса,
 // создает короткий путь и возвращает ег ов виде строки с полным URL.
 // Ожидается Content-Type: text/plain
@@ -34,6 +44,13 @@ func (h *Handler) CreateURL(c *gin.Context) {
 	if err != nil {
 		if errors.Is(err, service.ErrValidation) {
 			c.String(http.StatusBadRequest, "Invalid Body!")
+			return
+		}
+		// Проверяем, является ли ошибка конфликтом существующего URL
+		var conflictErr *service.ErrURLConflict
+		if errors.As(err, &conflictErr) {
+			c.Header("Content-Type", "text/plain; charset=utf-8")
+			c.String(http.StatusConflict, conflictErr.ShortURL)
 			return
 		}
 		logger.Log.Error("Failed to create URL", zap.Error(err))
@@ -73,21 +90,20 @@ func (h *Handler) GetURLJSON(c *gin.Context) {
 			c.String(http.StatusBadRequest, "invalid request")
 			return
 		}
+		// Проверяем, является ли ошибка конфликтом существующего URL
+		var conflictErr *service.ErrURLConflict
+		if errors.As(err, &conflictErr) {
+			resp := models.Response{Result: conflictErr.ShortURL}
+			h.sendJSONResponse(c, http.StatusConflict, resp)
+			return
+		}
 		logger.Log.Error("Failed to get URL", zap.Error(err))
 		c.String(http.StatusInternalServerError, "Internal server error!")
 		return
 	}
 
 	resp := models.Response{Result: result}
-
-	c.Writer.Header().Set("Content-Type", "application/json")
-	c.Writer.WriteHeader(http.StatusCreated)
-
-	if err := json.NewEncoder(c.Writer).Encode(resp); err != nil {
-		logger.Log.Error("Failed to get URL", zap.Error(err))
-		c.String(http.StatusInternalServerError, "Internal server error!")
-		return
-	}
+	h.sendJSONResponse(c, http.StatusCreated, resp)
 }
 
 // Ping хендлер проверяет соединение с базой данных.
@@ -131,12 +147,5 @@ func (h *Handler) CreateURLBatch(c *gin.Context) {
 		return
 	}
 
-	c.Writer.Header().Set("Content-Type", "application/json")
-	c.Writer.WriteHeader(http.StatusCreated)
-
-	if err := json.NewEncoder(c.Writer).Encode(responseItems); err != nil {
-		logger.Log.Error("Failed to create batch URLs", zap.Error(err))
-		c.String(http.StatusInternalServerError, "Internal server error!")
-		return
-	}
+	h.sendJSONResponse(c, http.StatusCreated, responseItems)
 }
