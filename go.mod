@@ -1,6 +1,6 @@
 module github.com/MaxRadzey/shortener
 
-go 1.24.2
+go 1.25.6
 
 require (
 	github.com/gin-gonic/gin v1.10.1

@@ -34,8 +34,7 @@ func (h *Handler) sendJSONResponse(c *gin.Context, statusCode int, data interfac
 func (h *Handler) CreateURL(c *gin.Context) {
 	body, err := io.ReadAll(c.Request.Body)
 	if err != nil {
-		logger.Log.Error("Failed to create URL", zap.Error(err))
-		c.String(http.StatusInternalServerError, "Error occurred while reading body!")
+		c.String(http.StatusBadRequest, "Invalid Body!")
 		return
 	}
 
