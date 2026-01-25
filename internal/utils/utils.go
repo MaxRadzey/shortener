@@ -30,3 +30,15 @@ func IsValidURL(urlToCheck string) bool {
 	_, err := url.ParseRequestURI(urlToCheck)
 	return err == nil
 }
+
+// MaskDSN скрывает пароль в DSN для безопасного логирования.
+// Простая маскировка - скрываем пароль после @
+// postgres://user:password@host:port/db -> postgres://user:***@host:port/db
+func MaskDSN(dsn string) string {
+	if idx := strings.Index(dsn, "@"); idx > 0 {
+		if passIdx := strings.LastIndex(dsn[:idx], ":"); passIdx > 0 {
+			return dsn[:passIdx+1] + "***" + dsn[idx:]
+		}
+	}
+	return dsn
+}
