@@ -24,10 +24,6 @@ func NewService(storage dbstorage.URLStorage, appConfig config.Config) *Service 
 }
 
 func (s *Service) CreateShortURL(longURL string) (string, error) {
-	if !utils.IsValidURL(longURL) {
-		return "", &ErrValidation{URL: longURL}
-	}
-
 	shortPath, err := utils.GetShortPath(longURL)
 	if err != nil {
 		return "", fmt.Errorf("failed to generate short path: %w", err)
@@ -65,16 +61,12 @@ func (s *Service) Ping(ctx context.Context) error {
 }
 
 // CreateShortURLBatch создает короткие URL для множества URL в одном запросе.
-// Валидирует все URL перед обработкой, генерирует короткие пути и сохраняет их атомарно.
+// Генерирует короткие пути и сохраняет их атомарно.
 func (s *Service) CreateShortURLBatch(ctx context.Context, items []models.BatchRequestItem) ([]models.BatchResponseItem, error) {
 	batchItems := make([]dbstorage.BatchItem, 0, len(items))
 	responseItems := make([]models.BatchResponseItem, 0, len(items))
 
 	for _, item := range items {
-		if !utils.IsValidURL(item.OriginalURL) {
-			return nil, &ErrValidation{URL: item.OriginalURL}
-		}
-
 		shortPath, err := utils.GetShortPath(item.OriginalURL)
 		if err != nil {
 			return nil, fmt.Errorf("failed to generate short path: %w", err)

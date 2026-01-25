@@ -9,6 +9,7 @@ import (
 	"github.com/MaxRadzey/shortener/internal/logger"
 	"github.com/MaxRadzey/shortener/internal/models"
 	"github.com/MaxRadzey/shortener/internal/service"
+	"github.com/MaxRadzey/shortener/internal/utils"
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
 )
@@ -40,13 +41,13 @@ func (h *Handler) CreateURL(c *gin.Context) {
 
 	text := string(body)
 
+	if !utils.IsValidURL(text) {
+		c.String(http.StatusBadRequest, "Invalid Body!")
+		return
+	}
+
 	result, err := h.Service.CreateShortURL(text)
 	if err != nil {
-		var validationErr *service.ErrValidation
-		if errors.As(err, &validationErr) {
-			c.String(http.StatusBadRequest, "Invalid Body!")
-			return
-		}
 		// Проверяем, является ли ошибка конфликтом существующего URL
 		var conflictErr *service.ErrURLConflict
 		if errors.As(err, &conflictErr) {
@@ -85,13 +86,13 @@ func (h *Handler) GetURLJSON(c *gin.Context) {
 		return
 	}
 
+	if !utils.IsValidURL(req.URL) {
+		c.String(http.StatusBadRequest, "invalid request")
+		return
+	}
+
 	result, err := h.Service.CreateShortURL(req.URL)
 	if err != nil {
-		var validationErr *service.ErrValidation
-		if errors.As(err, &validationErr) {
-			c.String(http.StatusBadRequest, "invalid request")
-			return
-		}
 		// Проверяем, является ли ошибка конфликтом существующего URL
 		var conflictErr *service.ErrURLConflict
 		if errors.As(err, &conflictErr) {
@@ -137,14 +138,16 @@ func (h *Handler) CreateURLBatch(c *gin.Context) {
 		return
 	}
 
-	ctx := c.Request.Context()
-	responseItems, err := h.Service.CreateShortURLBatch(ctx, reqItems)
-	if err != nil {
-		var validationErr *service.ErrValidation
-		if errors.As(err, &validationErr) {
+	for _, item := range reqItems {
+		if !utils.IsValidURL(item.OriginalURL) {
 			c.String(http.StatusBadRequest, "invalid request")
 			return
 		}
+	}
+
+	ctx := c.Request.Context()
+	responseItems, err := h.Service.CreateShortURLBatch(ctx, reqItems)
+	if err != nil {
 		logger.Log.Error("Failed to create batch URLs", zap.Error(err))
 		c.String(http.StatusInternalServerError, "Internal server error!")
 		return
