@@ -103,3 +103,7 @@ func (p *PostgresStorage) CreateBatch(ctx context.Context, items []BatchItem) er
 
 	return nil
 }
+
+func (p *PostgresStorage) Ping(ctx context.Context) error {
+	return p.db.Ping(ctx)
+}

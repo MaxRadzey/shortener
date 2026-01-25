@@ -47,3 +47,8 @@ func (m *MemoryStorage) CreateBatch(ctx context.Context, items []BatchItem) erro
 
 	return nil
 }
+
+func (m *MemoryStorage) Ping(ctx context.Context) error {
+	// In-memory хранилище всегда доступно
+	return nil
+}

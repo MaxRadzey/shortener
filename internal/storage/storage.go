@@ -30,6 +30,7 @@ type URLStorage interface {
 	Get(short string) (string, error)
 	Create(short, full string) error
 	CreateBatch(ctx context.Context, items []BatchItem) error
+	Ping(ctx context.Context) error
 }
 
 type Storage struct {
@@ -154,5 +155,15 @@ func (s *Storage) CreateBatch(ctx context.Context, items []BatchItem) error {
 		return fmt.Errorf("write url to file error: %w", err)
 	}
 
+	return nil
+}
+
+func (s *Storage) Ping(ctx context.Context) error {
+	// Проверяем доступность файла для записи
+	file, err := os.OpenFile(s.filePath, os.O_RDWR|os.O_CREATE, 0755)
+	if err != nil {
+		return fmt.Errorf("file storage not available: %w", err)
+	}
+	_ = file.Close()
 	return nil
 }

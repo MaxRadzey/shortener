@@ -38,6 +38,11 @@ func (f *FakeStorage) CreateBatch(ctx context.Context, items []dbstorage.BatchIt
 	return nil
 }
 
+func (f *FakeStorage) Ping(ctx context.Context) error {
+	// FakeStorage всегда доступен для тестов
+	return nil
+}
+
 // newFakeStorage создает новый экземпляр FakeStorage.
 func newFakeStorage(data map[string]string) *FakeStorage {
 	if data == nil {
@@ -48,7 +53,7 @@ func newFakeStorage(data map[string]string) *FakeStorage {
 
 // setupTestHandler создает handler для тестов с указанным хранилищем.
 func setupTestHandler(storage dbstorage.URLStorage) *httphandlers.Handler {
-	urlService := service.NewService(storage, *AppConfig, nil)
+	urlService := service.NewService(storage, *AppConfig)
 	return &httphandlers.Handler{Service: urlService}
 }
 

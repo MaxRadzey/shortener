@@ -9,20 +9,17 @@ import (
 	"github.com/MaxRadzey/shortener/internal/models"
 	dbstorage "github.com/MaxRadzey/shortener/internal/storage"
 	"github.com/MaxRadzey/shortener/internal/utils"
-	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type Service struct {
 	storage   dbstorage.URLStorage
 	appConfig config.Config
-	db        *pgxpool.Pool
 }
 
-func NewService(storage dbstorage.URLStorage, appConfig config.Config, db *pgxpool.Pool) *Service {
+func NewService(storage dbstorage.URLStorage, appConfig config.Config) *Service {
 	return &Service{
 		storage:   storage,
 		appConfig: appConfig,
-		db:        db,
 	}
 }
 
@@ -61,13 +58,10 @@ func (s *Service) GetLongURL(shortPath string) (string, error) {
 	return longURL, nil
 }
 
-// Ping проверяет соединение с базой данных.
-// Возвращает ошибку, если БД недоступна или соединение не установлено.
+// Ping проверяет соединение с хранилищем.
+// Возвращает ошибку, если хранилище недоступно.
 func (s *Service) Ping(ctx context.Context) error {
-	if s.db == nil {
-		return errors.New("database connection not available")
-	}
-	return s.db.Ping(ctx)
+	return s.storage.Ping(ctx)
 }
 
 // CreateShortURLBatch создает короткие URL для множества URL в одном запросе.

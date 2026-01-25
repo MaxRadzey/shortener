@@ -21,7 +21,7 @@ func Run(AppConfig *config.Config) error {
 		return err
 	}
 
-	urlService := service.NewService(storageResult.Storage, *AppConfig, storageResult.DB)
+	urlService := service.NewService(storageResult.Storage, *AppConfig)
 	h := &httphandlers.Handler{
 		Service: urlService,
 	}
