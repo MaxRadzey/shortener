@@ -77,7 +77,9 @@ func setAuthCookie(w http.ResponseWriter, userID, secret string) {
 	http.SetCookie(w, cookie)
 }
 
-func validateCookie(cookie *http.Cookie, secret string) (string, error) {
+// ValidateCookie проверяет валидность куки и возвращает userID, если кука валидна.
+// Возвращает ошибку, если кука невалидна или отсутствует.
+func ValidateCookie(cookie *http.Cookie, secret string) (string, error) {
 	if cookie == nil || cookie.Value == "" {
 		return "", errors.New("empty cookie value")
 	}
@@ -95,4 +97,8 @@ func validateCookie(cookie *http.Cookie, secret string) (string, error) {
 		return "", errors.New("invalid signature")
 	}
 	return userID, nil
+}
+
+func validateCookie(cookie *http.Cookie, secret string) (string, error) {
+	return ValidateCookie(cookie, secret)
 }
