@@ -8,7 +8,9 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/MaxRadzey/shortener/internal/auth"
 	"github.com/MaxRadzey/shortener/internal/models"
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -367,4 +369,79 @@ func TestCreateURLBatch(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestGetUserURLs(t *testing.T) {
+	t.Run("no cookie returns 401", func(t *testing.T) {
+		storage := newFakeStorage(nil)
+		handler := setupTestHandler(storage)
+		router := setupTestRouter(handler)
+
+		r := httptest.NewRequest(http.MethodGet, "/api/user/urls", nil)
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, r)
+
+		require.Equal(t, http.StatusUnauthorized, w.Code)
+		assert.Empty(t, w.Header().Get("Set-Cookie"), "на /api/user/urls куку не выдаём")
+	})
+
+	t.Run("invalid cookie returns 401", func(t *testing.T) {
+		storage := newFakeStorage(nil)
+		handler := setupTestHandler(storage)
+		router := setupTestRouter(handler)
+
+		r := httptest.NewRequest(http.MethodGet, "/api/user/urls", nil)
+		r.AddCookie(&http.Cookie{Name: auth.CookieName, Value: "invalid.garbage"})
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, r)
+
+		require.Equal(t, http.StatusUnauthorized, w.Code)
+	})
+
+	t.Run("valid cookie no URLs returns 204", func(t *testing.T) {
+		storage := newFakeStorage(nil)
+		handler := setupTestHandler(storage)
+		router := setupTestRouter(handler)
+
+		userID := uuid.New().String()
+		r := httptest.NewRequest(http.MethodGet, "/api/user/urls", nil)
+		r.AddCookie(auth.NewCookie(userID, AppConfig.SigningKey))
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, r)
+
+		require.Equal(t, http.StatusNoContent, w.Code)
+		assert.Empty(t, w.Body.String())
+	})
+
+	t.Run("valid cookie with URLs returns 200 and JSON", func(t *testing.T) {
+		storage := newFakeStorage(nil)
+		handler := setupTestHandler(storage)
+		router := setupTestRouter(handler)
+
+		userID := uuid.New().String()
+		cookie := auth.NewCookie(userID, AppConfig.SigningKey)
+
+		// Shorten via POST /api/shorten with same user cookie
+		body := bytes.NewReader([]byte(`{"url":"https://example.com"}`))
+		req := httptest.NewRequest(http.MethodPost, "/api/shorten", body)
+		req.Header.Set("Content-Type", "application/json")
+		req.AddCookie(cookie)
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+		require.Equal(t, http.StatusCreated, w.Code)
+
+		// Get user URLs
+		r := httptest.NewRequest(http.MethodGet, "/api/user/urls", nil)
+		r.AddCookie(cookie)
+		w2 := httptest.NewRecorder()
+		router.ServeHTTP(w2, r)
+
+		require.Equal(t, http.StatusOK, w2.Code)
+		var items []models.UserURLItem
+		err := json.NewDecoder(w2.Body).Decode(&items)
+		require.NoError(t, err)
+		require.Len(t, items, 1)
+		assert.Equal(t, "https://example.com", items[0].OriginalURL)
+		assert.Contains(t, items[0].ShortURL, AppConfig.ReturningAddress)
+	})
 }

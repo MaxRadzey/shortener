@@ -15,40 +15,50 @@ var AppConfig = config.New()
 
 // FakeStorage - мок хранилища для тестов.
 type FakeStorage struct {
-	data map[string]string
+	data map[string]dbstorage.URLEntry
 }
 
 func (f *FakeStorage) Get(short string) (string, error) {
 	val, ok := f.data[short]
 	if !ok {
-		return "", dbstorage.ErrNotFound
+		return "", &dbstorage.ErrNotFound{ShortPath: short}
 	}
-	return val, nil
+	return val.FullURL, nil
 }
 
-func (f *FakeStorage) Create(short, full string) error {
-	f.data[short] = full
+func (f *FakeStorage) Create(item dbstorage.URLEntry) error {
+	f.data[item.ShortPath] = item
 	return nil
 }
 
-func (f *FakeStorage) CreateBatch(ctx context.Context, items []dbstorage.BatchItem) error {
+func (f *FakeStorage) CreateBatch(ctx context.Context, items []dbstorage.URLEntry) error {
 	for _, item := range items {
-		f.data[item.ShortPath] = item.FullURL
+		f.data[item.ShortPath] = item
 	}
 	return nil
+}
+
+func (f *FakeStorage) GetByUserID(ctx context.Context, userID string) ([]dbstorage.UserURL, error) {
+	var out []dbstorage.UserURL
+	for short, entry := range f.data {
+		if entry.UserID == userID {
+			out = append(out, dbstorage.UserURL{ShortPath: short, OriginalURL: entry.FullURL})
+		}
+	}
+	return out, nil
 }
 
 func (f *FakeStorage) Ping(ctx context.Context) error {
-	// FakeStorage всегда доступен для тестов
 	return nil
 }
 
 // newFakeStorage создает новый экземпляр FakeStorage.
 func newFakeStorage(data map[string]string) *FakeStorage {
-	if data == nil {
-		data = make(map[string]string)
+	entries := make(map[string]dbstorage.URLEntry)
+	for short, fullURL := range data {
+		entries[short] = dbstorage.URLEntry{ShortPath: short, FullURL: fullURL, UserID: ""}
 	}
-	return &FakeStorage{data: data}
+	return &FakeStorage{data: entries}
 }
 
 // setupTestHandler создает handler для тестов с указанным хранилищем.
@@ -60,5 +70,5 @@ func setupTestHandler(storage dbstorage.URLStorage) *httphandlers.Handler {
 // setupTestRouter создает роутер для тестов с указанным handler.
 func setupTestRouter(handler *httphandlers.Handler) *gin.Engine {
 	gin.SetMode(gin.TestMode)
-	return router.SetupRouter(handler)
+	return router.SetupRouter(handler, AppConfig)
 }
