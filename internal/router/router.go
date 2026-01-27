@@ -19,21 +19,16 @@ func SetupRouter(h *handler.Handler, cfg *config.Config) *gin.Engine {
 
 	r.Use(logger.RequestLogger())
 	r.Use(logger.ResponseLogger())
+
 	r.Use(middleware.Gzip())
+	r.Use(middleware.Auth(cfg.SigningKey))
 
-	// Роуты с автоматической аутентификацией (создают пользователя, если куки нет)
-	authenticated := r.Group("")
-	authenticated.Use(middleware.Auth(cfg.SigningKey))
-	authenticated.POST("/", h.CreateURL)
-	authenticated.GET("/:short_path", h.GetURL)
-	authenticated.POST("/api/shorten", h.GetURLJSON)
-	authenticated.POST("/api/shorten/batch", h.CreateURLBatch)
-	authenticated.GET("/ping", h.Ping)
-
-	// Защищенные роуты, требующие валидную куку
-	protected := r.Group("")
-	protected.Use(middleware.RequireAuth(cfg.SigningKey))
-	protected.GET("/api/user/urls", h.GetUserURLs)
+	r.POST("/", h.CreateURL)
+	r.GET("/:short_path", h.GetURL)
+	r.POST("/api/shorten", h.GetURLJSON)
+	r.POST("/api/shorten/batch", h.CreateURLBatch)
+	r.GET("/ping", h.Ping)
+	r.GET("/api/user/urls", h.GetUserURLs)
 
 	return r
 }
