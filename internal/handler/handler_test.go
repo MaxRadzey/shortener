@@ -1,4 +1,4 @@
-package main
+package handler_test
 
 import (
 	"bytes"
@@ -8,21 +8,41 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/MaxRadzey/shortener/internal/config"
 	"github.com/MaxRadzey/shortener/internal/contextkeys"
+	"github.com/MaxRadzey/shortener/internal/handler"
 	"github.com/MaxRadzey/shortener/internal/models"
+	"github.com/MaxRadzey/shortener/internal/router"
 	dbstorage "github.com/MaxRadzey/shortener/internal/storage"
+	"github.com/MaxRadzey/shortener/internal/service"
+	teststorage "github.com/MaxRadzey/shortener/internal/testing"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
+var testConfig = &config.Config{
+	Address:          "localhost:8080",
+	ReturningAddress: "http://localhost:8080",
+	LogLevel:         "info",
+	FilePath:         "data.json",
+	DatabaseDSN:      "postgres://shortener:shortener@localhost:5432/shortener",
+	SigningKey:       "dev-signing-key-change-in-production",
+}
+
+// setupTestHandler создает handler для тестов с указанным хранилищем.
+func setupTestHandler(storage dbstorage.URLStorage) *handler.Handler {
+	urlService := service.NewService(storage, *testConfig)
+	return &handler.Handler{Service: urlService}
+}
+
 func TestGetURL(t *testing.T) {
-	storage := newFakeStorage(map[string]string{
+	gin.SetMode(gin.TestMode)
+	storage := teststorage.NewFakeStorageWithData(map[string]string{
 		"XxLlqM": "https://vk.com",
 	})
-
-	handler := setupTestHandler(storage)
-	router := setupTestRouter(handler)
+	h := setupTestHandler(storage)
+	rt := router.SetupRouter(h, testConfig)
 
 	type want struct {
 		code     int
@@ -66,24 +86,23 @@ func TestGetURL(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			r := httptest.NewRequest(test.method, "/"+test.request, nil)
-			w := httptest.NewRecorder()
+			req := httptest.NewRequest(test.method, "/"+test.request, nil)
+			rec := httptest.NewRecorder()
+			rt.ServeHTTP(rec, req)
 
-			router.ServeHTTP(w, r)
-
-			assert.Equal(t, test.want.code, w.Code, "Код ответа не совпадает с ожидаемым")
-
+			assert.Equal(t, test.want.code, rec.Code, "Код ответа не совпадает с ожидаемым")
 			if test.want.Location != "" {
-				assert.Equal(t, test.want.Location, w.Header().Get("Location"), "Заголовок Location не совпадает с ожидаемым")
+				assert.Equal(t, test.want.Location, rec.Header().Get("Location"), "Заголовок Location не совпадает с ожидаемым")
 			}
 		})
 	}
 }
 
 func TestCreateURL(t *testing.T) {
-	storage := newFakeStorage(nil)
-	handler := setupTestHandler(storage)
-	router := setupTestRouter(handler)
+	gin.SetMode(gin.TestMode)
+	storage := teststorage.NewFakeStorageWithData(nil)
+	h := setupTestHandler(storage)
+	rt := router.SetupRouter(h, testConfig)
 
 	type want struct {
 		code     int
@@ -104,7 +123,7 @@ func TestCreateURL(t *testing.T) {
 			contentType: "text/plain; charset=utf-8",
 			want: want{
 				code:     http.StatusCreated,
-				response: AppConfig.ReturningAddress + "/XxLlqM",
+				response: testConfig.ReturningAddress + "/XxLlqM",
 			},
 		},
 		{
@@ -131,24 +150,21 @@ func TestCreateURL(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			requestBody := strings.NewReader(test.body)
-
-			r := httptest.NewRequest(test.method, "/", requestBody)
-			r.Header.Set("Content-Type", test.contentType)
-			w := httptest.NewRecorder()
-
-			router.ServeHTTP(w, r)
-
-			require.Equal(t, test.want.code, w.Code, "Код ответа не совпадает с ожидаемым")
-			require.Equal(t, test.want.response, w.Body.String(), "Body не совпадает с ожидаемым")
+			req := httptest.NewRequest(test.method, "/", strings.NewReader(test.body))
+			req.Header.Set("Content-Type", test.contentType)
+			rec := httptest.NewRecorder()
+			rt.ServeHTTP(rec, req)
+			require.Equal(t, test.want.code, rec.Code, "Код ответа не совпадает с ожидаемым")
+			require.Equal(t, test.want.response, rec.Body.String(), "Body не совпадает с ожидаемым")
 		})
 	}
 }
 
 func TestGetURLJSON(t *testing.T) {
-	storage := newFakeStorage(nil)
-	handler := setupTestHandler(storage)
-	router := setupTestRouter(handler)
+	gin.SetMode(gin.TestMode)
+	storage := teststorage.NewFakeStorageWithData(nil)
+	h := setupTestHandler(storage)
+	rt := router.SetupRouter(h, testConfig)
 
 	type want struct {
 		code     int
@@ -215,22 +231,21 @@ func TestGetURLJSON(t *testing.T) {
 				requestBody = bytes.NewReader([]byte(v))
 			}
 
-			r := httptest.NewRequest(test.method, "/api/shorten", requestBody)
-			r.Header.Set("Content-Type", test.contentType)
-			w := httptest.NewRecorder()
-
-			router.ServeHTTP(w, r)
-
-			require.Equal(t, strings.TrimSpace(test.want.response), strings.TrimSpace(w.Body.String()), "Body не совпадает с ожидаемым")
-			require.Equal(t, test.want.code, w.Code, "Код ответа не совпадает с ожидаемым")
+			req := httptest.NewRequest(test.method, "/api/shorten", requestBody)
+			req.Header.Set("Content-Type", test.contentType)
+			rec := httptest.NewRecorder()
+			rt.ServeHTTP(rec, req)
+			require.Equal(t, strings.TrimSpace(test.want.response), strings.TrimSpace(rec.Body.String()), "Body не совпадает с ожидаемым")
+			require.Equal(t, test.want.code, rec.Code, "Код ответа не совпадает с ожидаемым")
 		})
 	}
 }
 
 func TestCreateURLBatch(t *testing.T) {
-	storage := newFakeStorage(nil)
-	handler := setupTestHandler(storage)
-	router := setupTestRouter(handler)
+	gin.SetMode(gin.TestMode)
+	storage := teststorage.NewFakeStorageWithData(nil)
+	h := setupTestHandler(storage)
+	rt := router.SetupRouter(h, testConfig)
 
 	type want struct {
 		code        int
@@ -256,7 +271,7 @@ func TestCreateURLBatch(t *testing.T) {
 			want: want{
 				code:        http.StatusCreated,
 				contentType: "application/json",
-				response:    `[{"correlation_id":"1","short_url":"http://localhost:8080/XxLlqM"},{"correlation_id":"2","short_url":"http://localhost:8080/` + getShortPathForURL("https://ya.ru") + `"}]`,
+				response:    `[{"correlation_id":"1","short_url":"http://localhost:8080/XxLlqM"},{"correlation_id":"2","short_url":"http://localhost:8080/dHBMtS"}]`,
 			},
 		},
 		{
@@ -335,21 +350,17 @@ func TestCreateURLBatch(t *testing.T) {
 				requestBody = bytes.NewReader([]byte{})
 			}
 
-			r := httptest.NewRequest(test.method, "/api/shorten/batch", requestBody)
-			r.Header.Set("Content-Type", test.contentType)
-			w := httptest.NewRecorder()
-
-			router.ServeHTTP(w, r)
-
-			require.Equal(t, test.want.code, w.Code, "Код ответа не совпадает с ожидаемым")
-
+			req := httptest.NewRequest(test.method, "/api/shorten/batch", requestBody)
+			req.Header.Set("Content-Type", test.contentType)
+			rec := httptest.NewRecorder()
+			rt.ServeHTTP(rec, req)
+			require.Equal(t, test.want.code, rec.Code, "Код ответа не совпадает с ожидаемым")
 			if test.want.contentType != "" {
-				contentType := w.Header().Get("Content-Type")
+				contentType := rec.Header().Get("Content-Type")
 				assert.Contains(t, contentType, test.want.contentType, "Content-Type не совпадает с ожидаемым")
 			}
-
 			if test.want.response != "" {
-				actualResponse := strings.TrimSpace(w.Body.String())
+				actualResponse := strings.TrimSpace(rec.Body.String())
 				if test.want.code == http.StatusCreated {
 					var actualItems []models.BatchResponseItem
 					err := json.Unmarshal([]byte(actualResponse), &actualItems)
@@ -375,15 +386,13 @@ func TestCreateURLBatch(t *testing.T) {
 func TestGetUserURLs(t *testing.T) {
 	// Создаем storage с данными для конкретного пользователя
 	userID := "test-user-id"
-	storage := &FakeStorage{
-		data: map[string]dbstorage.URLEntry{
-			"XxLlqM": {ShortPath: "XxLlqM", FullURL: "https://vk.com", UserID: userID},
-			"AbCdEf": {ShortPath: "AbCdEf", FullURL: "https://ya.ru", UserID: userID},
-			"Other1": {ShortPath: "Other1", FullURL: "https://google.com", UserID: "other-user-id"},
-		},
-	}
+	storage := teststorage.NewFakeStorageWithEntries(map[string]dbstorage.URLEntry{
+		"XxLlqM": {ShortPath: "XxLlqM", FullURL: "https://vk.com", UserID: userID},
+		"AbCdEf": {ShortPath: "AbCdEf", FullURL: "https://ya.ru", UserID: userID},
+		"Other1": {ShortPath: "Other1", FullURL: "https://google.com", UserID: "other-user-id"},
+	})
 
-	handler := setupTestHandler(storage)
+	h := setupTestHandler(storage)
 
 	type want struct {
 		code        int
@@ -431,29 +440,26 @@ func TestGetUserURLs(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			// Создаем роутер с нужным userID для каждого теста
-			testRouter := gin.New()
-			testRouter.HandleMethodNotAllowed = true
-			testRouter.Use(func(c *gin.Context) {
+			rt := gin.New()
+			rt.HandleMethodNotAllowed = true
+			rt.NoMethod(func(c *gin.Context) {
+				c.String(http.StatusMethodNotAllowed, "Method not allowed!")
+			})
+			rt.Use(func(c *gin.Context) {
 				c.Set(contextkeys.UserIDKey, test.userID)
 				c.Next()
 			})
-			testRouter.GET("/api/user/urls", handler.GetUserURLs)
-
-			r := httptest.NewRequest(test.method, "/api/user/urls", nil)
-			w := httptest.NewRecorder()
-
-			testRouter.ServeHTTP(w, r)
-
-			require.Equal(t, test.want.code, w.Code, "Код ответа не совпадает с ожидаемым")
-
+			rt.GET("/api/user/urls", h.GetUserURLs)
+			req := httptest.NewRequest(test.method, "/api/user/urls", nil)
+			rec := httptest.NewRecorder()
+			rt.ServeHTTP(rec, req)
+			require.Equal(t, test.want.code, rec.Code, "Код ответа не совпадает с ожидаемым")
 			if test.want.contentType != "" {
-				contentType := w.Header().Get("Content-Type")
+				contentType := rec.Header().Get("Content-Type")
 				assert.Contains(t, contentType, test.want.contentType, "Content-Type не совпадает с ожидаемым")
 			}
-
 			if test.want.response != "" {
-				actualResponse := strings.TrimSpace(w.Body.String())
+				actualResponse := strings.TrimSpace(rec.Body.String())
 				if test.want.code == http.StatusOK {
 					var actualItems []models.UserURLItem
 					err := json.Unmarshal([]byte(actualResponse), &actualItems)

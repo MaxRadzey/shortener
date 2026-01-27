@@ -1,7 +1,6 @@
 package middleware
 
 import (
-	"context"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -10,49 +9,11 @@ import (
 	httphandlers "github.com/MaxRadzey/shortener/internal/handler"
 	"github.com/MaxRadzey/shortener/internal/service"
 	dbstorage "github.com/MaxRadzey/shortener/internal/storage"
+	teststorage "github.com/MaxRadzey/shortener/internal/testing"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
-
-// TestStorage - мок хранилища для тестов миделваря
-type TestStorage struct {
-	data map[string]dbstorage.URLEntry
-}
-
-func (t *TestStorage) Get(short string) (string, error) {
-	val, ok := t.data[short]
-	if !ok {
-		return "", &dbstorage.ErrNotFound{ShortPath: short}
-	}
-	return val.FullURL, nil
-}
-
-func (t *TestStorage) Create(item dbstorage.URLEntry) error {
-	t.data[item.ShortPath] = item
-	return nil
-}
-
-func (t *TestStorage) CreateBatch(ctx context.Context, items []dbstorage.URLEntry) error {
-	for _, item := range items {
-		t.data[item.ShortPath] = item
-	}
-	return nil
-}
-
-func (t *TestStorage) GetByUserID(ctx context.Context, userID string) ([]dbstorage.UserURL, error) {
-	var out []dbstorage.UserURL
-	for short, entry := range t.data {
-		if entry.UserID == userID {
-			out = append(out, dbstorage.UserURL{ShortPath: short, OriginalURL: entry.FullURL})
-		}
-	}
-	return out, nil
-}
-
-func (t *TestStorage) Ping(ctx context.Context) error {
-	return nil
-}
 
 func TestAuth(t *testing.T) {
 	secretKey := "test-secret-key"
@@ -63,13 +24,10 @@ func TestAuth(t *testing.T) {
 
 	gin.SetMode(gin.TestMode)
 
-	// Создаем storage с данными для пользователя
-	userID := "test-user-id"
-	storage := &TestStorage{
-		data: map[string]dbstorage.URLEntry{
-			"XxLlqM": {ShortPath: "XxLlqM", FullURL: "https://vk.com", UserID: userID},
-		},
-	}
+	userID := "550e8400-e29b-41d4-a716-446655440000"
+	storage := teststorage.NewFakeStorageWithEntries(map[string]dbstorage.URLEntry{
+		"XxLlqM": {ShortPath: "XxLlqM", FullURL: "https://vk.com", UserID: userID},
+	})
 
 	// Создаем handler
 	urlService := service.NewService(storage, *cfg)
@@ -147,7 +105,9 @@ func TestAuth(t *testing.T) {
 			require.Equal(t, test.expectedStatus, w.Code, test.description+": Код ответа не совпадает с ожидаемым")
 
 			// Проверяем наличие куки в ответе
-			cookies := w.Result().Cookies()
+			res := w.Result()
+			defer res.Body.Close()
+			cookies := res.Cookies()
 			if test.expectCookie {
 				assert.Greater(t, len(cookies), 0, "Ожидалась установка куки")
 				// Проверяем, что кука валидна
