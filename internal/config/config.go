@@ -11,6 +11,9 @@ type Config struct {
 	LogLevel         string
 	FilePath         string
 	DatabaseDSN      string
+	// SigningKey — секрет для HMAC-подписи куки (не шифрование). Кука = base64(userID).base64(hmac).
+	// В проде обязательно задавать через SECRET_KEY; дефолт — только для локальной разработки.
+	SigningKey string
 }
 
 func New() *Config {
@@ -20,6 +23,7 @@ func New() *Config {
 		LogLevel:         "info",
 		FilePath:         "data.json",
 		DatabaseDSN:      "postgres://shortener:shortener@localhost:5432/shortener",
+		SigningKey:       "dev-signing-key-change-in-production",
 	}
 }
 
@@ -38,6 +42,9 @@ func ParseEnv(config *Config) {
 	}
 	if DatabaseDSN := os.Getenv("DATABASE_DSN"); DatabaseDSN != "" {
 		config.DatabaseDSN = DatabaseDSN
+	}
+	if v := os.Getenv("SECRET_KEY"); v != "" {
+		config.SigningKey = v
 	}
 }
 

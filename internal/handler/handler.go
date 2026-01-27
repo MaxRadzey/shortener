@@ -6,15 +6,24 @@ import (
 	"io"
 	"net/http"
 
+	"github.com/MaxRadzey/shortener/internal/contextkeys"
 	"github.com/MaxRadzey/shortener/internal/logger"
 	"github.com/MaxRadzey/shortener/internal/models"
 	"github.com/MaxRadzey/shortener/internal/service"
+	"github.com/MaxRadzey/shortener/internal/utils"
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
 )
 
 type Handler struct {
 	Service *service.Service
+}
+
+// userIDFromContext возвращает user_id из контекста. ok == false, если нет или пусто.
+func (h *Handler) userIDFromContext(c *gin.Context) (userID string, ok bool) {
+	v, _ := c.Get(contextkeys.UserIDKey)
+	userID, _ = v.(string)
+	return userID, userID != ""
 }
 
 // sendJSONResponse отправляет JSON ответ и обрабатывает ошибки кодирования
@@ -28,25 +37,30 @@ func (h *Handler) sendJSONResponse(c *gin.Context, statusCode int, data interfac
 }
 
 // CreateURL хэндлер, обрабатывает POST-запросы, принимает текстовый URL в теле запроса,
-// создает короткий путь и возвращает ег ов виде строки с полным URL.
-// Ожидается Content-Type: text/plain
+// создает короткий путь и возвращает его в виде строки с полным URL.
+// Ожидается Content-Type: text/plain. user_id в контексте от auth.
 func (h *Handler) CreateURL(c *gin.Context) {
+	userID, ok := h.userIDFromContext(c)
+	if !ok {
+		c.String(http.StatusInternalServerError, "Internal server error!")
+		return
+	}
+
 	body, err := io.ReadAll(c.Request.Body)
 	if err != nil {
-		logger.Log.Error("Failed to create URL", zap.Error(err))
-		c.String(http.StatusInternalServerError, "Error occurred while reading body!")
+		c.String(http.StatusBadRequest, "Invalid Body!")
 		return
 	}
 
 	text := string(body)
 
-	result, err := h.Service.CreateShortURL(text)
+	if !utils.IsValidURL(text) {
+		c.String(http.StatusBadRequest, "Invalid Body!")
+		return
+	}
+
+	result, err := h.Service.CreateShortURL(text, userID)
 	if err != nil {
-		var validationErr *service.ErrValidation
-		if errors.As(err, &validationErr) {
-			c.String(http.StatusBadRequest, "Invalid Body!")
-			return
-		}
 		// Проверяем, является ли ошибка конфликтом существующего URL
 		var conflictErr *service.ErrURLConflict
 		if errors.As(err, &conflictErr) {
@@ -78,6 +92,12 @@ func (h *Handler) GetURL(c *gin.Context) {
 }
 
 func (h *Handler) GetURLJSON(c *gin.Context) {
+	userID, ok := h.userIDFromContext(c)
+	if !ok {
+		c.String(http.StatusInternalServerError, "Internal server error!")
+		return
+	}
+
 	var req models.Request
 
 	if err := json.NewDecoder(c.Request.Body).Decode(&req); err != nil {
@@ -85,13 +105,13 @@ func (h *Handler) GetURLJSON(c *gin.Context) {
 		return
 	}
 
-	result, err := h.Service.CreateShortURL(req.URL)
+	if !utils.IsValidURL(req.URL) {
+		c.String(http.StatusBadRequest, "invalid request")
+		return
+	}
+
+	result, err := h.Service.CreateShortURL(req.URL, userID)
 	if err != nil {
-		var validationErr *service.ErrValidation
-		if errors.As(err, &validationErr) {
-			c.String(http.StatusBadRequest, "invalid request")
-			return
-		}
 		// Проверяем, является ли ошибка конфликтом существующего URL
 		var conflictErr *service.ErrURLConflict
 		if errors.As(err, &conflictErr) {
@@ -137,18 +157,50 @@ func (h *Handler) CreateURLBatch(c *gin.Context) {
 		return
 	}
 
-	ctx := c.Request.Context()
-	responseItems, err := h.Service.CreateShortURLBatch(ctx, reqItems)
-	if err != nil {
-		var validationErr *service.ErrValidation
-		if errors.As(err, &validationErr) {
+	for _, item := range reqItems {
+		if !utils.IsValidURL(item.OriginalURL) {
 			c.String(http.StatusBadRequest, "invalid request")
 			return
 		}
+	}
+
+	userID, ok := h.userIDFromContext(c)
+	if !ok {
+		c.String(http.StatusInternalServerError, "Internal server error!")
+		return
+	}
+
+	ctx := c.Request.Context()
+	responseItems, err := h.Service.CreateShortURLBatch(ctx, reqItems, userID)
+	if err != nil {
 		logger.Log.Error("Failed to create batch URLs", zap.Error(err))
 		c.String(http.StatusInternalServerError, "Internal server error!")
 		return
 	}
 
 	h.sendJSONResponse(c, http.StatusCreated, responseItems)
+}
+
+// GetUserURLs возвращает все сокращённые пользователем URL.
+func (h *Handler) GetUserURLs(c *gin.Context) {
+	userID, ok := h.userIDFromContext(c)
+	if !ok {
+		c.AbortWithStatus(http.StatusUnauthorized)
+		return
+	}
+
+	ctx := c.Request.Context()
+	items, err := h.Service.GetUserURLs(ctx, userID)
+	if err != nil {
+		logger.Log.Error("Failed to get user URLs", zap.Error(err))
+		c.String(http.StatusInternalServerError, "Internal server error!")
+		return
+	}
+
+	if len(items) == 0 {
+		c.Status(http.StatusNoContent)
+		return
+	}
+
+	h.sendJSONResponse(c, http.StatusOK, items)
 }
