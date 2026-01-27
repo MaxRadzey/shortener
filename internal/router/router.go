@@ -3,6 +3,7 @@ package router
 import (
 	"net/http"
 
+	"github.com/MaxRadzey/shortener/internal/config"
 	"github.com/MaxRadzey/shortener/internal/handler"
 	"github.com/MaxRadzey/shortener/internal/logger"
 	"github.com/MaxRadzey/shortener/internal/middleware"
@@ -10,7 +11,7 @@ import (
 )
 
 // SetupRouter создает и настраивает HTTP роутер со всеми middleware и маршрутами.
-func SetupRouter(h *handler.Handler) *gin.Engine {
+func SetupRouter(h *handler.Handler, cfg *config.Config) *gin.Engine {
 	r := gin.Default()
 	r.HandleMethodNotAllowed = true
 
@@ -18,13 +19,16 @@ func SetupRouter(h *handler.Handler) *gin.Engine {
 
 	r.Use(logger.RequestLogger())
 	r.Use(logger.ResponseLogger())
+
 	r.Use(middleware.Gzip())
+	r.Use(middleware.Auth(cfg.SigningKey))
 
 	r.POST("/", h.CreateURL)
 	r.GET("/:short_path", h.GetURL)
 	r.POST("/api/shorten", h.GetURLJSON)
 	r.POST("/api/shorten/batch", h.CreateURLBatch)
 	r.GET("/ping", h.Ping)
+	r.GET("/api/user/urls", h.GetUserURLs)
 
 	return r
 }

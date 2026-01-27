@@ -37,7 +37,7 @@ func (p *PostgresStorage) Get(short string) (string, error) {
 	err := p.db.QueryRow(ctx, "SELECT original_url FROM urls WHERE short_path = $1", short).Scan(&originalURL)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return "", ErrNotFound
+			return "", &ErrNotFound{ShortPath: short}
 		}
 		return "", fmt.Errorf("failed to get URL: %w", err)
 	}
@@ -45,17 +45,15 @@ func (p *PostgresStorage) Get(short string) (string, error) {
 	return originalURL, nil
 }
 
-func (p *PostgresStorage) Create(short, full string) error {
+func (p *PostgresStorage) Create(item URLEntry) error {
 	ctx := context.Background()
 
-	_, err := p.db.Exec(ctx, "INSERT INTO urls (short_path, original_url) VALUES ($1, $2)", short, full)
+	_, err := p.db.Exec(ctx, "INSERT INTO urls (short_path, original_url, user_id) VALUES ($1, $2, $3)", item.ShortPath, item.FullURL, item.UserID)
 	if err != nil {
-		// Проверяем, является ли ошибка нарушением уникального ограничения на original_url
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
-			// Получаем существующий short_path для данного original_url
 			var existingShortPath string
-			queryErr := p.db.QueryRow(ctx, "SELECT short_path FROM urls WHERE original_url = $1", full).Scan(&existingShortPath)
+			queryErr := p.db.QueryRow(ctx, "SELECT short_path FROM urls WHERE original_url = $1", item.FullURL).Scan(&existingShortPath)
 			if queryErr != nil {
 				return fmt.Errorf("failed to get existing short_path: %w", queryErr)
 			}
@@ -67,17 +65,16 @@ func (p *PostgresStorage) Create(short, full string) error {
 	return nil
 }
 
-func (p *PostgresStorage) CreateBatch(ctx context.Context, items []BatchItem) error {
+func (p *PostgresStorage) CreateBatch(ctx context.Context, items []URLEntry) error {
 	// Используем транзакцию для атомарности
 	tx, err := p.db.Begin(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to begin transaction: %w", err)
 	}
 
-	// Подготавливаем batch insert с множественными VALUES
 	batch := &pgx.Batch{}
 	for _, item := range items {
-		batch.Queue("INSERT INTO urls (short_path, original_url) VALUES ($1, $2) ON CONFLICT (short_path) DO NOTHING", item.ShortPath, item.FullURL)
+		batch.Queue("INSERT INTO urls (short_path, original_url, user_id) VALUES ($1, $2, $3) ON CONFLICT (short_path) DO NOTHING", item.ShortPath, item.FullURL, item.UserID)
 	}
 
 	results := tx.SendBatch(ctx, batch)
@@ -102,4 +99,26 @@ func (p *PostgresStorage) CreateBatch(ctx context.Context, items []BatchItem) er
 	}
 
 	return nil
+}
+
+func (p *PostgresStorage) GetByUserID(ctx context.Context, userID string) ([]UserURL, error) {
+	rows, err := p.db.Query(ctx, "SELECT short_path, original_url FROM urls WHERE user_id = $1", userID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get URLs by user: %w", err)
+	}
+	defer rows.Close()
+
+	var out []UserURL
+	for rows.Next() {
+		var u UserURL
+		if err := rows.Scan(&u.ShortPath, &u.OriginalURL); err != nil {
+			return nil, fmt.Errorf("failed to scan row: %w", err)
+		}
+		out = append(out, u)
+	}
+	return out, rows.Err()
+}
+
+func (p *PostgresStorage) Ping(ctx context.Context) error {
+	return p.db.Ping(ctx)
 }
