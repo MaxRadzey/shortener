@@ -26,6 +26,18 @@ func (h *Handler) userIDFromContext(c *gin.Context) (userID string, ok bool) {
 	return userID, userID != ""
 }
 
+// requireUserID получает user_id из контекста и проверяет его наличие.
+// При отсутствии user_id отправляет HTTP 401 Unauthorized и возвращает false.
+// При успехе возвращает userID и true.
+func (h *Handler) requireUserID(c *gin.Context) (userID string, ok bool) {
+	userID, ok = h.userIDFromContext(c)
+	if !ok {
+		c.AbortWithStatus(http.StatusUnauthorized)
+		return "", false
+	}
+	return userID, true
+}
+
 // sendJSONResponse отправляет JSON ответ и обрабатывает ошибки кодирования
 func (h *Handler) sendJSONResponse(c *gin.Context, statusCode int, data interface{}) {
 	c.Writer.Header().Set("Content-Type", "application/json")
@@ -34,6 +46,16 @@ func (h *Handler) sendJSONResponse(c *gin.Context, statusCode int, data interfac
 		logger.Log.Error("Failed to encode JSON response", zap.Error(err))
 		c.String(http.StatusInternalServerError, "Internal server error!")
 	}
+}
+
+// decodeJSONBody декодирует JSON тело запроса в указанную структуру.
+// При ошибке декодирования возвращает false и отправляет ответ с HTTP 400 Bad Request.
+func (h *Handler) decodeJSONBody(c *gin.Context, target interface{}) bool {
+	if err := json.NewDecoder(c.Request.Body).Decode(target); err != nil {
+		c.String(http.StatusBadRequest, "invalid request")
+		return false
+	}
+	return true
 }
 
 // CreateURL хэндлер, обрабатывает POST-запросы, принимает текстовый URL в теле запроса,
@@ -99,9 +121,7 @@ func (h *Handler) GetURLJSON(c *gin.Context) {
 	}
 
 	var req models.Request
-
-	if err := json.NewDecoder(c.Request.Body).Decode(&req); err != nil {
-		c.String(http.StatusBadRequest, "invalid request")
+	if !h.decodeJSONBody(c, &req) {
 		return
 	}
 
@@ -146,9 +166,7 @@ func (h *Handler) Ping(c *gin.Context) {
 // создает короткие URL для всех URL и возвращает массив объектов с correlation_id и short_url.
 func (h *Handler) CreateURLBatch(c *gin.Context) {
 	var reqItems []models.BatchRequestItem
-
-	if err := json.NewDecoder(c.Request.Body).Decode(&reqItems); err != nil {
-		c.String(http.StatusBadRequest, "invalid request")
+	if !h.decodeJSONBody(c, &reqItems) {
 		return
 	}
 
@@ -183,9 +201,8 @@ func (h *Handler) CreateURLBatch(c *gin.Context) {
 
 // GetUserURLs возвращает все сокращённые пользователем URL.
 func (h *Handler) GetUserURLs(c *gin.Context) {
-	userID, ok := h.userIDFromContext(c)
+	userID, ok := h.requireUserID(c)
 	if !ok {
-		c.AbortWithStatus(http.StatusUnauthorized)
 		return
 	}
 
@@ -203,4 +220,36 @@ func (h *Handler) GetUserURLs(c *gin.Context) {
 	}
 
 	h.sendJSONResponse(c, http.StatusOK, items)
+}
+
+// DeleteURLs обрабатывает DELETE-запрос для асинхронного удаления сокращённых URL.
+// Принимает список идентификаторов сокращённых URL в теле запроса (JSON массив строк).
+// Возвращает HTTP 202 Accepted при успешном приёме запроса.
+func (h *Handler) DeleteURLs(c *gin.Context) {
+	userID, ok := h.requireUserID(c)
+	if !ok {
+		return
+	}
+
+	var shortUrls []string
+	if !h.decodeJSONBody(c, &shortUrls) {
+		return
+	}
+
+	if len(shortUrls) == 0 {
+		c.String(http.StatusBadRequest, "invalid request")
+		return
+	}
+
+	ctx := c.Request.Context()
+
+	// Запускаем асинхронное удаление в горутине
+	go func() {
+		if err := h.Service.DeleteURLs(ctx, userID, shortUrls); err != nil {
+			logger.Log.Error("Failed to delete URLs", zap.Error(err))
+			// Не оповещаем пользователя об ошибках, так как удаление асинхронное
+		}
+	}()
+
+	c.Status(http.StatusAccepted)
 }
