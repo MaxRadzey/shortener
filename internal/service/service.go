@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync"
 
 	"github.com/MaxRadzey/shortener/internal/config"
 	"github.com/MaxRadzey/shortener/internal/models"
@@ -105,4 +106,70 @@ func (s *Service) GetUserURLs(ctx context.Context, userID string) ([]models.User
 		})
 	}
 	return out, nil
+}
+
+
+const (
+	// deleteBatchSize размер буфера для batch update при удалении URL
+	deleteBatchSize = 100
+	// deleteWorkers количество воркеров для обработки удаления
+	deleteWorkers = 3
+)
+
+// DeleteURLs удаляет сокращённые URL по списку идентификаторов для указанного пользователя.
+// Использует паттерн fanIn для эффективного batch update: несколько воркеров собирают
+// shortPaths в буферы, которые затем обрабатываются batch update операциями.
+// Вызывается асинхронно из хендлера, поэтому ошибки логируются, но не возвращаются пользователю.
+func (s *Service) DeleteURLs(ctx context.Context, userID string, shortUrls []string) error {
+	// Создаем входной канал для shortPaths
+	inputChan := make(chan string, len(shortUrls))
+	for _, shortPath := range shortUrls {
+		inputChan <- shortPath
+	}
+	close(inputChan)
+
+	// Создаем канал для буферов (fan-in паттерн)
+	bufferChan := make(chan []string, deleteWorkers)
+
+	// Запускаем воркеры для сбора данных в буферы
+	var wg sync.WaitGroup
+	for i := 0; i < deleteWorkers; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			buffer := make([]string, 0, deleteBatchSize)
+
+			for shortPath := range inputChan {
+				buffer = append(buffer, shortPath)
+
+				// Когда буфер заполнен, отправляем его на обработку
+				if len(buffer) >= deleteBatchSize {
+					bufferChan <- buffer
+					buffer = make([]string, 0, deleteBatchSize)
+				}
+			}
+
+			// Отправляем оставшиеся элементы
+			if len(buffer) > 0 {
+				bufferChan <- buffer
+			}
+		}()
+	}
+
+	// Закрываем канал буферов после завершения всех воркеров
+	go func() {
+		wg.Wait()
+		close(bufferChan)
+	}()
+
+	// Обрабатываем буферы batch update операциями
+	var lastErr error
+	for buffer := range bufferChan {
+		if err := s.storage.DeleteBatch(ctx, userID, buffer); err != nil {
+			lastErr = fmt.Errorf("failed to delete batch: %w", err)
+			// Продолжаем обработку остальных буферов
+		}
+	}
+
+	return lastErr
 }
