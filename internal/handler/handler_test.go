@@ -38,8 +38,10 @@ func setupTestHandler(storage dbstorage.URLStorage) *handler.Handler {
 
 func TestGetURL(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	storage := teststorage.NewFakeStorageWithData(map[string]string{
-		"XxLlqM": "https://vk.com",
+	// Хранилище: обычная запись и удалённая (IsDeleted: true)
+	storage := teststorage.NewFakeStorageWithEntries(map[string]dbstorage.URLEntry{
+		"XxLlqM": {ShortPath: "XxLlqM", FullURL: "https://vk.com", UserID: "", IsDeleted: false},
+		"AbCdEf": {ShortPath: "AbCdEf", FullURL: "https://ya.ru", UserID: "", IsDeleted: true},
 	})
 	h := setupTestHandler(storage)
 	rt := router.SetupRouter(h, testConfig)
@@ -80,6 +82,14 @@ func TestGetURL(t *testing.T) {
 			want: want{
 				code:     http.StatusNotFound,
 				Location: "",
+			},
+		},
+		{
+			name:    "Test #4 deleted URL returns 410 Gone",
+			method:  http.MethodGet,
+			request: "AbCdEf",
+			want: want{
+				code: http.StatusGone,
 			},
 		},
 	}
@@ -478,6 +488,89 @@ func TestGetUserURLs(t *testing.T) {
 					assert.Equal(t, test.want.response, actualResponse, "Body не совпадает с ожидаемым")
 				}
 			}
+		})
+	}
+}
+
+func TestDeleteURLs(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	userID := "550e8400-e29b-41d4-a716-446655440000"
+	storage := teststorage.NewFakeStorageWithEntries(map[string]dbstorage.URLEntry{
+		"XxLlqM": {ShortPath: "XxLlqM", FullURL: "https://vk.com", UserID: userID},
+		"AbCdEf": {ShortPath: "AbCdEf", FullURL: "https://ya.ru", UserID: userID},
+	})
+	h := setupTestHandler(storage)
+
+	type want struct {
+		code int
+	}
+
+	tests := []struct {
+		name   string
+		method string
+		userID string
+		body   interface{}
+		want   want
+	}{
+		{
+			name:   "valid request returns 202 Accepted",
+			method: http.MethodDelete,
+			userID: userID,
+			body:   []string{"XxLlqM", "AbCdEf"},
+			want:   want{code: http.StatusAccepted},
+		},
+		{
+			name:   "no auth returns 401 Unauthorized",
+			method: http.MethodDelete,
+			userID: "",
+			body:   []string{"XxLlqM"},
+			want:   want{code: http.StatusUnauthorized},
+		},
+		{
+			name:   "invalid body returns 400 Bad Request",
+			method: http.MethodDelete,
+			userID: userID,
+			body:   "not an array",
+			want:   want{code: http.StatusBadRequest},
+		},
+		{
+			name:   "empty array returns 400 Bad Request",
+			method: http.MethodDelete,
+			userID: userID,
+			body:   []string{},
+			want:   want{code: http.StatusBadRequest},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			rt := gin.New()
+			rt.HandleMethodNotAllowed = true
+			rt.NoMethod(func(c *gin.Context) {
+				c.String(http.StatusMethodNotAllowed, "Method not allowed!")
+			})
+			rt.Use(func(c *gin.Context) {
+				c.Set(contextkeys.UserIDKey, test.userID)
+				c.Next()
+			})
+			rt.DELETE("/api/user/urls", h.DeleteURLs)
+
+			var bodyBytes []byte
+			switch v := test.body.(type) {
+			case []string:
+				bodyBytes, _ = json.Marshal(v)
+			case string:
+				bodyBytes = []byte(v)
+			default:
+				bodyBytes, _ = json.Marshal(test.body)
+			}
+
+			req := httptest.NewRequest(test.method, "/api/user/urls", bytes.NewReader(bodyBytes))
+			req.Header.Set("Content-Type", "application/json")
+			rec := httptest.NewRecorder()
+			rt.ServeHTTP(rec, req)
+
+			require.Equal(t, test.want.code, rec.Code, "Код ответа не совпадает с ожидаемым")
 		})
 	}
 }
