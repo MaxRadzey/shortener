@@ -21,12 +21,10 @@ func Run(AppConfig *config.Config) error {
 		return err
 	}
 
-	urlService := service.NewService(storageResult.Storage, *AppConfig, storageResult.DB)
-	h := &httphandlers.Handler{
-		Service: urlService,
-	}
+	urlService := service.NewService(storageResult.Storage, *AppConfig)
+	h := &httphandlers.Handler{Service: urlService}
 
-	r := router.SetupRouter(h)
+	r := router.SetupRouter(h, AppConfig)
 
 	logger.Log.Info("Starting HTTP server", zap.String("address", AppConfig.Address))
 	return r.Run(AppConfig.Address)
