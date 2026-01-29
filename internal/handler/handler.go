@@ -10,6 +10,7 @@ import (
 	"github.com/MaxRadzey/shortener/internal/logger"
 	"github.com/MaxRadzey/shortener/internal/models"
 	"github.com/MaxRadzey/shortener/internal/service"
+	dbstorage "github.com/MaxRadzey/shortener/internal/storage"
 	"github.com/MaxRadzey/shortener/internal/utils"
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
@@ -100,12 +101,18 @@ func (h *Handler) CreateURL(c *gin.Context) {
 }
 
 // GetURL хэндлер, обрабатывает GET-запросы, получает в качестве параметра маршрута сокращенное значение URL,
-// ищет в БД совпадение длинного пути и производит редирект на него (307), иначе отдает (404) ошибку.
+// ищет в БД совпадение длинного пути и производит редирект на него (307).
+// Для удалённого URL возвращает 410 Gone, для отсутствующего — 404 Not Found.
 func (h *Handler) GetURL(c *gin.Context) {
 	shortPath := c.Param("short_path")
 	longURL, err := h.Service.GetLongURL(shortPath)
 
 	if err != nil {
+		var goneErr *dbstorage.ErrGone
+		if errors.As(err, &goneErr) {
+			c.String(http.StatusGone, "Gone")
+			return
+		}
 		c.String(http.StatusNotFound, "Not found!")
 		return
 	}

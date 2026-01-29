@@ -9,6 +9,13 @@ import (
 	"sync"
 )
 
+// fileRecord — формат одной записи в файле (url, user_id, is_deleted).
+type fileRecord struct {
+	FullURL   string `json:"url"`
+	UserID    string `json:"user_id"`
+	IsDeleted bool   `json:"is_deleted"`
+}
+
 type Storage struct {
 	mu       sync.RWMutex
 	filePath string
@@ -41,12 +48,24 @@ func (s *Storage) readFromFile() (map[string]URLEntry, error) {
 		return res, nil
 	}
 
+	line := scanner.Bytes()
+
+	// Новый формат: map[string]fileRecord
+	var byShortNew map[string]fileRecord
+	if err := json.Unmarshal(line, &byShortNew); err == nil {
+		for k, v := range byShortNew {
+			res[k] = URLEntry{ShortPath: k, FullURL: v.FullURL, UserID: v.UserID, IsDeleted: v.IsDeleted}
+		}
+		return res, nil
+	}
+
+	// Старый формат (совместимость): map[string]string — без user_id и is_deleted
 	var byShort map[string]string
-	if err := json.Unmarshal([]byte(scanner.Text()), &byShort); err != nil {
+	if err := json.Unmarshal(line, &byShort); err != nil {
 		return nil, err
 	}
 	for k, v := range byShort {
-		res[k] = URLEntry{ShortPath: k, FullURL: v, UserID: ""}
+		res[k] = URLEntry{ShortPath: k, FullURL: v, UserID: "", IsDeleted: false}
 	}
 	return res, nil
 }
@@ -77,6 +96,9 @@ func (s *Storage) Get(id string) (string, error) {
 	if !ok {
 		return "", &ErrNotFound{ShortPath: id}
 	}
+	if r.IsDeleted {
+		return "", &ErrGone{ShortPath: id}
+	}
 	return r.FullURL, nil
 }
 
@@ -97,9 +119,9 @@ func (s *Storage) CreateBatch(ctx context.Context, items []URLEntry) error {
 }
 
 func (s *Storage) writeToFile(data map[string]URLEntry) error {
-	byShort := make(map[string]string)
+	byShort := make(map[string]fileRecord)
 	for k, r := range data {
-		byShort[k] = r.FullURL
+		byShort[k] = fileRecord{FullURL: r.FullURL, UserID: r.UserID, IsDeleted: r.IsDeleted}
 	}
 	raw, err := json.Marshal(byShort)
 	if err != nil {
@@ -132,6 +154,26 @@ func (s *Storage) GetByUserID(ctx context.Context, userID string) ([]UserURL, er
 		}
 	}
 	return out, nil
+}
+
+// DeleteBatch проставляет флаг is_deleted у записей по списку short_path для указанного пользователя.
+func (s *Storage) DeleteBatch(ctx context.Context, userID string, shortPaths []string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	data, err := s.readFromFile()
+	if err != nil {
+		return fmt.Errorf("read from file error: %w", err)
+	}
+
+	for _, shortPath := range shortPaths {
+		if entry, exists := data[shortPath]; exists && entry.UserID == userID {
+			entry.IsDeleted = true
+			data[shortPath] = entry
+		}
+	}
+
+	return s.writeToFile(data)
 }
 
 func (s *Storage) Ping(ctx context.Context) error {

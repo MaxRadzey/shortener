@@ -33,13 +33,18 @@ func NewPostgresStorage(db *pgxpool.Pool) (*PostgresStorage, error) {
 func (p *PostgresStorage) Get(short string) (string, error) {
 	ctx := context.Background()
 	var originalURL string
+	var isDeleted bool
 
-	err := p.db.QueryRow(ctx, "SELECT original_url FROM urls WHERE short_path = $1", short).Scan(&originalURL)
+	err := p.db.QueryRow(ctx, "SELECT original_url, COALESCE(is_deleted, false) FROM urls WHERE short_path = $1", short).Scan(&originalURL, &isDeleted)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return "", &ErrNotFound{ShortPath: short}
 		}
 		return "", fmt.Errorf("failed to get URL: %w", err)
+	}
+
+	if isDeleted {
+		return "", &ErrGone{ShortPath: short}
 	}
 
 	return originalURL, nil
@@ -117,6 +122,48 @@ func (p *PostgresStorage) GetByUserID(ctx context.Context, userID string) ([]Use
 		out = append(out, u)
 	}
 	return out, rows.Err()
+}
+
+// DeleteBatch выполняет batch update для установки флага is_deleted = true
+// для указанных short_path, принадлежащих указанному user_id.
+func (p *PostgresStorage) DeleteBatch(ctx context.Context, userID string, shortPaths []string) error {
+	// Используем транзакцию для атомарности
+	tx, err := p.db.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	// Используем batch для эффективного множественного обновления
+	batch := &pgx.Batch{}
+	for _, shortPath := range shortPaths {
+		// Обновляем только записи, принадлежащие указанному пользователю
+		batch.Queue(
+			"UPDATE urls SET is_deleted = true WHERE short_path = $1 AND user_id = $2",
+			shortPath, userID,
+		)
+	}
+
+	results := tx.SendBatch(ctx, batch)
+
+	// Выполняем все запросы
+	for i := 0; i < len(shortPaths); i++ {
+		_, err := results.Exec()
+		if err != nil {
+			results.Close()
+			return fmt.Errorf("failed to delete batch item: %w", err)
+		}
+	}
+
+	if err := results.Close(); err != nil {
+		return fmt.Errorf("failed to close batch results: %w", err)
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("failed to commit transaction: %w", err)
+	}
+
+	return nil
 }
 
 func (p *PostgresStorage) Ping(ctx context.Context) error {

@@ -23,11 +23,22 @@ func (e *ErrURLAlreadyExists) Error() string {
 	return fmt.Sprintf("url already exists with short_path: %s", e.ShortPath)
 }
 
+// ErrGone — ошибка, когда URL найден, но помечен как удалённый (is_deleted).
+// Используется для возврата 410 Gone только в хендлере GET /{id}.
+type ErrGone struct {
+	ShortPath string
+}
+
+func (e *ErrGone) Error() string {
+	return fmt.Sprintf("url is deleted: %s", e.ShortPath)
+}
+
 // URLEntry — запись для создания URL.
 type URLEntry struct {
 	ShortPath string
 	FullURL   string
 	UserID    string
+	IsDeleted bool
 }
 
 // UserURL — short_path + original_url, используется в GetByUserID.
@@ -42,5 +53,6 @@ type URLStorage interface {
 	Create(item URLEntry) error
 	CreateBatch(ctx context.Context, items []URLEntry) error
 	GetByUserID(ctx context.Context, userID string) ([]UserURL, error)
+	DeleteBatch(ctx context.Context, userID string, shortPaths []string) error
 	Ping(ctx context.Context) error
 }

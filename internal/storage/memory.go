@@ -24,6 +24,9 @@ func (m *MemoryStorage) Get(short string) (string, error) {
 	if !ok {
 		return "", &ErrNotFound{ShortPath: short}
 	}
+	if r.IsDeleted {
+		return "", &ErrGone{ShortPath: short}
+	}
 	return r.FullURL, nil
 }
 
@@ -62,10 +65,11 @@ func (m *MemoryStorage) DeleteBatch(ctx context.Context, userID string, shortPat
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	// Удаляем только записи, принадлежащие указанному пользователю
+	// Проставляем флаг удаления только у записей, принадлежащих пользователю
 	for _, shortPath := range shortPaths {
 		if entry, exists := m.data[shortPath]; exists && entry.UserID == userID {
-			delete(m.data, shortPath)
+			entry.IsDeleted = true
+			m.data[shortPath] = entry
 		}
 	}
 
