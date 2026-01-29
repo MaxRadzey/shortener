@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"io"
@@ -248,11 +249,9 @@ func (h *Handler) DeleteURLs(c *gin.Context) {
 		return
 	}
 
-	ctx := c.Request.Context()
-
-	// Запускаем асинхронное удаление в горутине
+	// Запускаем асинхронное удаление в горутине.
 	go func() {
-		if err := h.Service.DeleteURLs(ctx, userID, shortUrls); err != nil {
+		if err := h.Service.DeleteURLs(context.Background(), userID, shortUrls); err != nil {
 			logger.Log.Error("Failed to delete URLs", zap.Error(err))
 			// Не оповещаем пользователя об ошибках, так как удаление асинхронное
 		}
