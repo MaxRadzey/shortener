@@ -58,6 +58,20 @@ func (m *MemoryStorage) GetByUserID(ctx context.Context, userID string) ([]UserU
 	return out, nil
 }
 
+func (m *MemoryStorage) DeleteBatch(ctx context.Context, userID string, shortPaths []string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	// Удаляем только записи, принадлежащие указанному пользователю
+	for _, shortPath := range shortPaths {
+		if entry, exists := m.data[shortPath]; exists && entry.UserID == userID {
+			delete(m.data, shortPath)
+		}
+	}
+
+	return nil
+}
+
 func (m *MemoryStorage) Ping(ctx context.Context) error {
 	// In-memory хранилище всегда доступно
 	return nil
