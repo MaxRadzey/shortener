@@ -11,7 +11,6 @@ import (
 	"github.com/MaxRadzey/shortener/internal/logger"
 	"github.com/MaxRadzey/shortener/internal/models"
 	"github.com/MaxRadzey/shortener/internal/service"
-	dbstorage "github.com/MaxRadzey/shortener/internal/storage"
 	"github.com/MaxRadzey/shortener/internal/utils"
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
@@ -114,7 +113,7 @@ func (h *Handler) GetURL(c *gin.Context) {
 	longURL, err := h.Service.GetLongURL(shortPath)
 
 	if err != nil {
-		var goneErr *dbstorage.ErrGone
+		var goneErr *service.ErrGone
 		if errors.As(err, &goneErr) {
 			h.sendErrorJSON(c, http.StatusGone, "Gone")
 			return

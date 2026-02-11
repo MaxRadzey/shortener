@@ -47,7 +47,16 @@ func (s *Service) CreateShortURL(longURL, userID string) (string, error) {
 func (s *Service) GetLongURL(shortPath string) (string, error) {
 	longURL, err := s.storage.Get(shortPath)
 	if err != nil {
-		return "", err
+		// Преобразуем ошибки storage в ошибки service для изоляции слоёв
+		var notFoundErr *dbstorage.ErrNotFound
+		var goneErr *dbstorage.ErrGone
+		if errors.As(err, &notFoundErr) {
+			return "", &ErrNotFound{ShortPath: notFoundErr.ShortPath}
+		}
+		if errors.As(err, &goneErr) {
+			return "", &ErrGone{ShortPath: goneErr.ShortPath}
+		}
+		return "", fmt.Errorf("failed to get URL: %w", err)
 	}
 
 	return longURL, nil
