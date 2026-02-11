@@ -1,9 +1,8 @@
-package main
+package utils
 
 import (
 	"testing"
 
-	"github.com/MaxRadzey/shortener/internal/utils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -31,7 +30,7 @@ func TestGetShortPath(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			value, err := utils.GetShortPath(test.value)
+			value, err := GetShortPath(test.value)
 			if !test.wantErr {
 				require.NoError(t, err)
 				assert.Equal(t, test.want, value)
@@ -62,14 +61,8 @@ func TestIsValidURL(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			result := utils.IsValidURL(test.inputURL)
+			result := IsValidURL(test.inputURL)
 			assert.Equal(t, result, test.want)
 		})
 	}
-}
-
-// getShortPathForURL возвращает короткий путь для URL (для тестов).
-func getShortPathForURL(url string) string {
-	path, _ := utils.GetShortPath(url)
-	return path
 }
