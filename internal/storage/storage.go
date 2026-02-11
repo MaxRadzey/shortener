@@ -35,7 +35,7 @@ func InitializeStorage(databaseDSN, filePath string) (*StorageResult, error) {
 		db, err = initDatabase(databaseDSN)
 		if err == nil && db != nil {
 			// Запустить миграции используя тот же DSN
-			if err := RunMigrations(databaseDSN); err != nil {
+			if err := RunMigrations(databaseDSN, ""); err != nil {
 				logger.Log.Warn("Migrations failed", zap.Error(err))
 			} else {
 				logger.Log.Info("Migrations completed successfully")
