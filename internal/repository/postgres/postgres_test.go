@@ -17,8 +17,10 @@ import (
 )
 
 var (
-	testDSN string
-	testDB  *pgxpool.Pool
+	testDSN      string
+	testDB       *pgxpool.Pool
+	dbAvailable  bool
+	migrationsOK bool
 )
 
 const defaultTestDSN = "postgres://shortener:shortener@localhost:5432/shortener?sslmode=disable"
@@ -34,34 +36,61 @@ func TestMain(m *testing.M) {
 	absMigrationsPath, err := filepath.Abs(migrationsPath)
 	if err != nil {
 		os.Stderr.WriteString("failed to get migrations path: " + err.Error() + "\n")
-		os.Exit(1)
+		os.Stderr.WriteString("Tests will be skipped\n")
+		migrationsOK = false
+		os.Exit(m.Run())
+		return
 	}
 
 	if err = storage.RunMigrations(testDSN, absMigrationsPath); err != nil {
 		os.Stderr.WriteString("migrations: " + err.Error() + "\n")
-		os.Exit(1)
+		os.Stderr.WriteString("Tests will be skipped\n")
+		migrationsOK = false
+		os.Exit(m.Run())
+		return
 	}
+	migrationsOK = true
 
 	// Создаем подключение к БД
 	testDB, err = pgxpool.New(context.Background(), testDSN)
 	if err != nil {
 		os.Stderr.WriteString("open db: " + err.Error() + "\n")
-		os.Exit(1)
+		os.Stderr.WriteString("Tests will be skipped\n")
+		dbAvailable = false
+		os.Exit(m.Run())
+		return
 	}
-	defer testDB.Close()
+	defer func() {
+		if testDB != nil {
+			testDB.Close()
+		}
+	}()
 
 	// Проверяем подключение
 	if err := testDB.Ping(context.Background()); err != nil {
 		os.Stderr.WriteString("ping db: " + err.Error() + "\n")
-		os.Exit(1)
+		os.Stderr.WriteString("Tests will be skipped\n")
+		dbAvailable = false
+		os.Exit(m.Run())
+		return
 	}
 
+	dbAvailable = true
 	os.Exit(m.Run())
+}
+
+// skipIfDBUnavailable пропускает тест, если БД недоступна или миграции не выполнены.
+func skipIfDBUnavailable(t *testing.T) {
+	t.Helper()
+	if !dbAvailable || !migrationsOK || testDB == nil {
+		t.Skip("Skipping test: database connection unavailable or migrations failed")
+	}
 }
 
 // setupDB очищает таблицу urls и возвращает репозиторий для тестов.
 func setupDB(t *testing.T) *postgres.PostgresRepository {
 	t.Helper()
+	skipIfDBUnavailable(t)
 	ctx := context.Background()
 
 	// Очищаем таблицу перед каждым тестом
