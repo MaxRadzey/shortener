@@ -37,6 +37,6 @@ func SetupRouter(h *handler.Handler, cfg *config.Config) *gin.Engine {
 // SetupMiddleware настраивает middleware для роутера.
 func SetupMiddleware(router *gin.Engine) {
 	router.NoMethod(func(c *gin.Context) {
-		c.String(http.StatusMethodNotAllowed, "Method not allowed!")
+		c.JSON(http.StatusMethodNotAllowed, gin.H{"error": "Method not allowed"})
 	})
 }

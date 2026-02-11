@@ -40,13 +40,18 @@ func (h *Handler) requireUserID(c *gin.Context) (userID string, ok bool) {
 	return userID, true
 }
 
+// sendErrorJSON отправляет JSON ответ с ошибкой в формате {"error": "..."}
+func (h *Handler) sendErrorJSON(c *gin.Context, statusCode int, errorMsg string) {
+	c.JSON(statusCode, gin.H{"error": errorMsg})
+}
+
 // sendJSONResponse отправляет JSON ответ и обрабатывает ошибки кодирования
 func (h *Handler) sendJSONResponse(c *gin.Context, statusCode int, data interface{}) {
 	c.Writer.Header().Set("Content-Type", "application/json")
 	c.Writer.WriteHeader(statusCode)
 	if err := json.NewEncoder(c.Writer).Encode(data); err != nil {
 		logger.Log.Error("Failed to encode JSON response", zap.Error(err))
-		c.String(http.StatusInternalServerError, "Internal server error!")
+		h.sendErrorJSON(c, http.StatusInternalServerError, "Internal server error")
 	}
 }
 
@@ -54,7 +59,7 @@ func (h *Handler) sendJSONResponse(c *gin.Context, statusCode int, data interfac
 // При ошибке декодирования возвращает false и отправляет ответ с HTTP 400 Bad Request.
 func (h *Handler) decodeJSONBody(c *gin.Context, target interface{}) bool {
 	if err := json.NewDecoder(c.Request.Body).Decode(target); err != nil {
-		c.String(http.StatusBadRequest, "invalid request")
+		h.sendErrorJSON(c, http.StatusBadRequest, "invalid request")
 		return false
 	}
 	return true
@@ -66,20 +71,20 @@ func (h *Handler) decodeJSONBody(c *gin.Context, target interface{}) bool {
 func (h *Handler) CreateURL(c *gin.Context) {
 	userID, ok := h.userIDFromContext(c)
 	if !ok {
-		c.String(http.StatusInternalServerError, "Internal server error!")
+		h.sendErrorJSON(c, http.StatusInternalServerError, "Internal server error")
 		return
 	}
 
 	body, err := io.ReadAll(c.Request.Body)
 	if err != nil {
-		c.String(http.StatusBadRequest, "Invalid Body!")
+		h.sendErrorJSON(c, http.StatusBadRequest, "Invalid Body")
 		return
 	}
 
 	text := string(body)
 
 	if !utils.IsValidURL(text) {
-		c.String(http.StatusBadRequest, "Invalid Body!")
+		h.sendErrorJSON(c, http.StatusBadRequest, "Invalid Body")
 		return
 	}
 
@@ -93,7 +98,7 @@ func (h *Handler) CreateURL(c *gin.Context) {
 			return
 		}
 		logger.Log.Error("Failed to create URL", zap.Error(err))
-		c.String(http.StatusInternalServerError, "Internal server error!")
+		h.sendErrorJSON(c, http.StatusInternalServerError, "Internal server error")
 		return
 	}
 
@@ -111,10 +116,10 @@ func (h *Handler) GetURL(c *gin.Context) {
 	if err != nil {
 		var goneErr *dbstorage.ErrGone
 		if errors.As(err, &goneErr) {
-			c.String(http.StatusGone, "Gone")
+			h.sendErrorJSON(c, http.StatusGone, "Gone")
 			return
 		}
-		c.String(http.StatusNotFound, "Not found!")
+		h.sendErrorJSON(c, http.StatusNotFound, "Not found")
 		return
 	}
 
@@ -124,7 +129,7 @@ func (h *Handler) GetURL(c *gin.Context) {
 func (h *Handler) GetURLJSON(c *gin.Context) {
 	userID, ok := h.userIDFromContext(c)
 	if !ok {
-		c.String(http.StatusInternalServerError, "Internal server error!")
+		h.sendErrorJSON(c, http.StatusInternalServerError, "Internal server error")
 		return
 	}
 
@@ -134,7 +139,7 @@ func (h *Handler) GetURLJSON(c *gin.Context) {
 	}
 
 	if !utils.IsValidURL(req.URL) {
-		c.String(http.StatusBadRequest, "invalid request")
+		h.sendErrorJSON(c, http.StatusBadRequest, "invalid request")
 		return
 	}
 
@@ -148,7 +153,7 @@ func (h *Handler) GetURLJSON(c *gin.Context) {
 			return
 		}
 		logger.Log.Error("Failed to get URL", zap.Error(err))
-		c.String(http.StatusInternalServerError, "Internal server error!")
+		h.sendErrorJSON(c, http.StatusInternalServerError, "Internal server error")
 		return
 	}
 
@@ -162,7 +167,7 @@ func (h *Handler) Ping(c *gin.Context) {
 	ctx := c.Request.Context()
 	if err := h.Service.Ping(ctx); err != nil {
 		logger.Log.Error("Failed to ping database", zap.Error(err))
-		c.String(http.StatusInternalServerError, "Database connection failed")
+		h.sendErrorJSON(c, http.StatusInternalServerError, "Database connection failed")
 		return
 	}
 
@@ -179,20 +184,20 @@ func (h *Handler) CreateURLBatch(c *gin.Context) {
 	}
 
 	if len(reqItems) == 0 {
-		c.String(http.StatusBadRequest, "invalid request")
+		h.sendErrorJSON(c, http.StatusBadRequest, "invalid request")
 		return
 	}
 
 	for _, item := range reqItems {
 		if !utils.IsValidURL(item.OriginalURL) {
-			c.String(http.StatusBadRequest, "invalid request")
+			h.sendErrorJSON(c, http.StatusBadRequest, "invalid request")
 			return
 		}
 	}
 
 	userID, ok := h.userIDFromContext(c)
 	if !ok {
-		c.String(http.StatusInternalServerError, "Internal server error!")
+		h.sendErrorJSON(c, http.StatusInternalServerError, "Internal server error")
 		return
 	}
 
@@ -200,7 +205,7 @@ func (h *Handler) CreateURLBatch(c *gin.Context) {
 	responseItems, err := h.Service.CreateShortURLBatch(ctx, reqItems, userID)
 	if err != nil {
 		logger.Log.Error("Failed to create batch URLs", zap.Error(err))
-		c.String(http.StatusInternalServerError, "Internal server error!")
+		h.sendErrorJSON(c, http.StatusInternalServerError, "Internal server error")
 		return
 	}
 
@@ -218,7 +223,7 @@ func (h *Handler) GetUserURLs(c *gin.Context) {
 	items, err := h.Service.GetUserURLs(ctx, userID)
 	if err != nil {
 		logger.Log.Error("Failed to get user URLs", zap.Error(err))
-		c.String(http.StatusInternalServerError, "Internal server error!")
+		h.sendErrorJSON(c, http.StatusInternalServerError, "Internal server error")
 		return
 	}
 
@@ -245,7 +250,7 @@ func (h *Handler) DeleteURLs(c *gin.Context) {
 	}
 
 	if len(shortUrls) == 0 {
-		c.String(http.StatusBadRequest, "invalid request")
+		h.sendErrorJSON(c, http.StatusBadRequest, "invalid request")
 		return
 	}
 

@@ -13,8 +13,8 @@ import (
 	"github.com/MaxRadzey/shortener/internal/handler"
 	"github.com/MaxRadzey/shortener/internal/models"
 	"github.com/MaxRadzey/shortener/internal/router"
-	dbstorage "github.com/MaxRadzey/shortener/internal/storage"
 	"github.com/MaxRadzey/shortener/internal/service"
+	dbstorage "github.com/MaxRadzey/shortener/internal/storage"
 	teststorage "github.com/MaxRadzey/shortener/internal/testing"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
@@ -34,6 +34,18 @@ var testConfig = &config.Config{
 func setupTestHandler(storage dbstorage.URLStorage) *handler.Handler {
 	urlService := service.NewService(storage, *testConfig)
 	return &handler.Handler{Service: urlService}
+}
+
+// assertResponse проверяет ответ: если оба ответа валидный JSON - сравнивает как JSON, иначе как строки
+func assertResponse(t *testing.T, expected, actual string) {
+	t.Helper()
+	var actualJSON, expectedJSON interface{}
+	if json.Unmarshal([]byte(actual), &actualJSON) == nil &&
+		json.Unmarshal([]byte(expected), &expectedJSON) == nil {
+		assert.Equal(t, expectedJSON, actualJSON, "JSON ответ не совпадает с ожидаемым")
+	} else {
+		require.Equal(t, expected, actual, "Body не совпадает с ожидаемым")
+	}
 }
 
 func TestGetURL(t *testing.T) {
@@ -143,7 +155,7 @@ func TestCreateURL(t *testing.T) {
 			contentType: "text/plain; charset=utf-8",
 			want: want{
 				code:     http.StatusMethodNotAllowed,
-				response: "Method not allowed!",
+				response: `{"error":"Method not allowed"}`,
 			},
 		},
 		{
@@ -153,7 +165,7 @@ func TestCreateURL(t *testing.T) {
 			contentType: "text/plain; charset=utf-8",
 			want: want{
 				code:     http.StatusBadRequest,
-				response: "Invalid Body!",
+				response: `{"error":"Invalid Body"}`,
 			},
 		},
 	}
@@ -165,7 +177,7 @@ func TestCreateURL(t *testing.T) {
 			rec := httptest.NewRecorder()
 			rt.ServeHTTP(rec, req)
 			require.Equal(t, test.want.code, rec.Code, "Код ответа не совпадает с ожидаемым")
-			require.Equal(t, test.want.response, rec.Body.String(), "Body не совпадает с ожидаемым")
+			assertResponse(t, test.want.response, strings.TrimSpace(rec.Body.String()))
 		})
 	}
 }
@@ -195,7 +207,7 @@ func TestGetURLJSON(t *testing.T) {
 			contentType: "application/json",
 			want: want{
 				code:     http.StatusMethodNotAllowed,
-				response: "Method not allowed!",
+				response: `{"error":"Method not allowed"}`,
 			},
 		},
 		{
@@ -215,7 +227,7 @@ func TestGetURLJSON(t *testing.T) {
 			contentType: "text/plain; charset=utf-8",
 			want: want{
 				code:     http.StatusBadRequest,
-				response: "invalid request",
+				response: `{"error":"invalid request"}`,
 			},
 		},
 		{
@@ -225,7 +237,7 @@ func TestGetURLJSON(t *testing.T) {
 			contentType: "application/json",
 			want: want{
 				code:     http.StatusBadRequest,
-				response: "invalid request",
+				response: `{"error":"invalid request"}`,
 			},
 		},
 	}
@@ -245,8 +257,8 @@ func TestGetURLJSON(t *testing.T) {
 			req.Header.Set("Content-Type", test.contentType)
 			rec := httptest.NewRecorder()
 			rt.ServeHTTP(rec, req)
-			require.Equal(t, strings.TrimSpace(test.want.response), strings.TrimSpace(rec.Body.String()), "Body не совпадает с ожидаемым")
 			require.Equal(t, test.want.code, rec.Code, "Код ответа не совпадает с ожидаемым")
+			assertResponse(t, test.want.response, strings.TrimSpace(rec.Body.String()))
 		})
 	}
 }
@@ -293,8 +305,8 @@ func TestCreateURLBatch(t *testing.T) {
 			contentType: "application/json",
 			want: want{
 				code:        http.StatusMethodNotAllowed,
-				contentType: "text/plain; charset=utf-8",
-				response:    "Method not allowed!",
+				contentType: "application/json",
+				response:    `{"error":"Method not allowed"}`,
 			},
 		},
 		{
@@ -304,8 +316,8 @@ func TestCreateURLBatch(t *testing.T) {
 			contentType: "application/json",
 			want: want{
 				code:        http.StatusBadRequest,
-				contentType: "text/plain; charset=utf-8",
-				response:    "invalid request",
+				contentType: "application/json",
+				response:    `{"error":"invalid request"}`,
 			},
 		},
 		{
@@ -315,8 +327,8 @@ func TestCreateURLBatch(t *testing.T) {
 			contentType: "application/json",
 			want: want{
 				code:        http.StatusBadRequest,
-				contentType: "text/plain; charset=utf-8",
-				response:    "invalid request",
+				contentType: "application/json",
+				response:    `{"error":"invalid request"}`,
 			},
 		},
 		{
@@ -328,8 +340,8 @@ func TestCreateURLBatch(t *testing.T) {
 			contentType: "application/json",
 			want: want{
 				code:        http.StatusBadRequest,
-				contentType: "text/plain; charset=utf-8",
-				response:    "invalid request",
+				contentType: "application/json",
+				response:    `{"error":"invalid request"}`,
 			},
 		},
 		{
@@ -369,26 +381,7 @@ func TestCreateURLBatch(t *testing.T) {
 				contentType := rec.Header().Get("Content-Type")
 				assert.Contains(t, contentType, test.want.contentType, "Content-Type не совпадает с ожидаемым")
 			}
-			if test.want.response != "" {
-				actualResponse := strings.TrimSpace(rec.Body.String())
-				if test.want.code == http.StatusCreated {
-					var actualItems []models.BatchResponseItem
-					err := json.Unmarshal([]byte(actualResponse), &actualItems)
-					require.NoError(t, err, "Ответ должен быть валидным JSON")
-
-					var expectedItems []models.BatchResponseItem
-					err = json.Unmarshal([]byte(test.want.response), &expectedItems)
-					require.NoError(t, err, "Ожидаемый ответ должен быть валидным JSON")
-
-					assert.Equal(t, len(expectedItems), len(actualItems), "Количество элементов не совпадает")
-					for i, expected := range expectedItems {
-						assert.Equal(t, expected.CorrelationID, actualItems[i].CorrelationID, "CorrelationID не совпадает")
-						assert.Equal(t, expected.ShortURL, actualItems[i].ShortURL, "ShortURL не совпадает")
-					}
-				} else {
-					assert.Equal(t, test.want.response, actualResponse, "Body не совпадает с ожидаемым")
-				}
-			}
+			assertResponse(t, test.want.response, strings.TrimSpace(rec.Body.String()))
 		})
 	}
 }
@@ -411,10 +404,10 @@ func TestGetUserURLs(t *testing.T) {
 	}
 
 	tests := []struct {
-		name    string
-		method  string
-		userID  string
-		want    want
+		name   string
+		method string
+		userID string
+		want   want
 	}{
 		{
 			name:   "Test #1 get user URLs with data",
@@ -442,8 +435,8 @@ func TestGetUserURLs(t *testing.T) {
 			userID: userID,
 			want: want{
 				code:        http.StatusMethodNotAllowed,
-				contentType: "text/plain; charset=utf-8",
-				response:    "Method not allowed!",
+				contentType: "application/json",
+				response:    `{"error":"Method not allowed"}`,
 			},
 		},
 	}
@@ -453,7 +446,7 @@ func TestGetUserURLs(t *testing.T) {
 			rt := gin.New()
 			rt.HandleMethodNotAllowed = true
 			rt.NoMethod(func(c *gin.Context) {
-				c.String(http.StatusMethodNotAllowed, "Method not allowed!")
+				c.JSON(http.StatusMethodNotAllowed, gin.H{"error": "Method not allowed"})
 			})
 			rt.Use(func(c *gin.Context) {
 				c.Set(contextkeys.UserIDKey, test.userID)
@@ -468,26 +461,7 @@ func TestGetUserURLs(t *testing.T) {
 				contentType := rec.Header().Get("Content-Type")
 				assert.Contains(t, contentType, test.want.contentType, "Content-Type не совпадает с ожидаемым")
 			}
-			if test.want.response != "" {
-				actualResponse := strings.TrimSpace(rec.Body.String())
-				if test.want.code == http.StatusOK {
-					var actualItems []models.UserURLItem
-					err := json.Unmarshal([]byte(actualResponse), &actualItems)
-					require.NoError(t, err, "Ответ должен быть валидным JSON")
-
-					var expectedItems []models.UserURLItem
-					err = json.Unmarshal([]byte(test.want.response), &expectedItems)
-					require.NoError(t, err, "Ожидаемый ответ должен быть валидным JSON")
-
-					assert.Equal(t, len(expectedItems), len(actualItems), "Количество элементов не совпадает")
-					for i, expected := range expectedItems {
-						assert.Equal(t, expected.ShortURL, actualItems[i].ShortURL, "ShortURL не совпадает")
-						assert.Equal(t, expected.OriginalURL, actualItems[i].OriginalURL, "OriginalURL не совпадает")
-					}
-				} else {
-					assert.Equal(t, test.want.response, actualResponse, "Body не совпадает с ожидаемым")
-				}
-			}
+			assertResponse(t, test.want.response, strings.TrimSpace(rec.Body.String()))
 		})
 	}
 }
@@ -547,7 +521,7 @@ func TestDeleteURLs(t *testing.T) {
 			rt := gin.New()
 			rt.HandleMethodNotAllowed = true
 			rt.NoMethod(func(c *gin.Context) {
-				c.String(http.StatusMethodNotAllowed, "Method not allowed!")
+				c.JSON(http.StatusMethodNotAllowed, gin.H{"error": "Method not allowed"})
 			})
 			rt.Use(func(c *gin.Context) {
 				c.Set(contextkeys.UserIDKey, test.userID)
