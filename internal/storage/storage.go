@@ -1,187 +1,107 @@
 package storage
 
 import (
-	"bufio"
 	"context"
-	"encoding/json"
-	"fmt"
-	"os"
-	"sync"
+
+	"github.com/MaxRadzey/shortener/internal/logger"
+	"github.com/MaxRadzey/shortener/internal/repository"
+	"github.com/MaxRadzey/shortener/internal/repository/file"
+	"github.com/MaxRadzey/shortener/internal/repository/memory"
+	"github.com/MaxRadzey/shortener/internal/repository/postgres"
+	"github.com/MaxRadzey/shortener/internal/utils"
+	"github.com/jackc/pgx/v5/pgxpool"
+	"go.uber.org/zap"
 )
 
-// fileRecord — формат одной записи в файле (url, user_id, is_deleted).
-type fileRecord struct {
-	FullURL   string `json:"url"`
-	UserID    string `json:"user_id"`
-	IsDeleted bool   `json:"is_deleted"`
+// StorageResult содержит результат инициализации хранилища.
+type StorageResult struct {
+	Repository repository.URLRepository
+	DB         *pgxpool.Pool
 }
 
-type Storage struct {
-	mu       sync.RWMutex
-	filePath string
-}
+// InitializeStorage выбирает и инициализирует хранилище согласно приоритетам:
+// 1. PostgreSQL (если указан DATABASE_DSN)
+// 2. Файловое хранилище (если указан FILE_PATH)
+// 3. In-memory (fallback)
+// Возвращает выбранный репозиторий и пул соединений БД (может быть nil).
+func InitializeStorage(databaseDSN, filePath string) (*StorageResult, error) {
+	var repo repository.URLRepository
+	var db *pgxpool.Pool
+	var err error
 
-func NewStorage(filePath string) (*Storage, error) {
-	if filePath == "" {
-		return nil, fmt.Errorf("file path cannot be empty")
+	// Приоритет 1: PostgreSQL
+	if databaseDSN != "" {
+		logger.Log.Info("Attempting to connect to PostgreSQL", zap.String("dsn", utils.MaskDSN(databaseDSN)))
+		db, err = initDatabase(databaseDSN)
+		if err == nil && db != nil {
+			// Запустить миграции используя тот же DSN
+			if err := RunMigrations(databaseDSN); err != nil {
+				logger.Log.Warn("Migrations failed", zap.Error(err))
+			} else {
+				logger.Log.Info("Migrations completed successfully")
+			}
+
+			postgresRepo, err := postgres.NewPostgresRepository(db)
+			if err == nil {
+				repo = postgresRepo
+				logger.Log.Info("PostgreSQL repository initialized")
+			} else {
+				logger.Log.Warn("Failed to initialize PostgreSQL repository", zap.Error(err))
+			}
+		} else {
+			logger.Log.Warn("Failed to connect to PostgreSQL, will try fallback repository", zap.Error(err))
+		}
 	}
 
-	return &Storage{
-		filePath: filePath,
+	// Приоритет 2: Файловое хранилище
+	if repo == nil && filePath != "" {
+		logger.Log.Info("Attempting to use file repository", zap.String("path", filePath))
+		fileRepo, err := file.NewFileRepository(filePath)
+		if err == nil {
+			repo = fileRepo
+			logger.Log.Info("File repository initialized")
+		} else {
+			logger.Log.Warn("Failed to initialize file repository", zap.Error(err))
+		}
+	}
+
+	// Приоритет 3: In-memory (fallback)
+	if repo == nil {
+		logger.Log.Info("Using in-memory repository as fallback")
+		repo = memory.NewMemoryRepository()
+	}
+
+	// Логируем финальный выбор репозитория
+	switch repo.(type) {
+	case *postgres.PostgresRepository:
+		logger.Log.Info("Repository selected: PostgreSQL")
+	case *file.FileRepository:
+		logger.Log.Info("Repository selected: File")
+	case *memory.MemoryRepository:
+		logger.Log.Info("Repository selected: In-Memory")
+	}
+
+	return &StorageResult{
+		Repository: repo,
+		DB:         db,
 	}, nil
 }
 
-func (s *Storage) readFromFile() (map[string]URLEntry, error) {
-	file, err := os.OpenFile(s.filePath, os.O_RDONLY|os.O_CREATE, 0777)
+// initDatabase создает подключение к PostgreSQL, если указан DSN.
+// Возвращает пул соединений или nil, если DSN не указан или подключение не удалось.
+func initDatabase(dsn string) (*pgxpool.Pool, error) {
+	if dsn == "" {
+		logger.Log.Debug("Database DSN is empty, skipping PostgreSQL connection")
+		return nil, nil
+	}
+
+	logger.Log.Debug("Creating PostgreSQL connection pool")
+	db, err := pgxpool.New(context.Background(), dsn)
 	if err != nil {
-		return nil, err
+		logger.Log.Warn("Failed to create connection pool", zap.Error(err))
+		return nil, nil
 	}
 
-	defer func(file *os.File) {
-		_ = file.Close()
-	}(file)
-
-	scanner := bufio.NewScanner(file)
-	res := make(map[string]URLEntry)
-
-	if ok := scanner.Scan(); !ok {
-		return res, nil
-	}
-
-	line := scanner.Bytes()
-
-	// Новый формат: map[string]fileRecord
-	var byShortNew map[string]fileRecord
-	if err := json.Unmarshal(line, &byShortNew); err == nil {
-		for k, v := range byShortNew {
-			res[k] = URLEntry{ShortPath: k, FullURL: v.FullURL, UserID: v.UserID, IsDeleted: v.IsDeleted}
-		}
-		return res, nil
-	}
-
-	// Старый формат (совместимость): map[string]string — без user_id и is_deleted
-	var byShort map[string]string
-	if err := json.Unmarshal(line, &byShort); err != nil {
-		return nil, err
-	}
-	for k, v := range byShort {
-		res[k] = URLEntry{ShortPath: k, FullURL: v, UserID: "", IsDeleted: false}
-	}
-	return res, nil
-}
-
-func (s *Storage) Create(item URLEntry) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	data, err := s.readFromFile()
-	if err != nil {
-		return fmt.Errorf("read from file error: %w", err)
-	}
-
-	data[item.ShortPath] = item
-	return s.writeToFile(data)
-}
-
-func (s *Storage) Get(id string) (string, error) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-
-	data, err := s.readFromFile()
-	if err != nil {
-		return "", fmt.Errorf("read from file error: %w", err)
-	}
-
-	r, ok := data[id]
-	if !ok {
-		return "", &ErrNotFound{ShortPath: id}
-	}
-	if r.IsDeleted {
-		return "", &ErrGone{ShortPath: id}
-	}
-	return r.FullURL, nil
-}
-
-func (s *Storage) CreateBatch(ctx context.Context, items []URLEntry) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	data, err := s.readFromFile()
-	if err != nil {
-		return fmt.Errorf("read from file error: %w", err)
-	}
-
-	for _, item := range items {
-		data[item.ShortPath] = item
-	}
-
-	return s.writeToFile(data)
-}
-
-func (s *Storage) writeToFile(data map[string]URLEntry) error {
-	byShort := make(map[string]fileRecord)
-	for k, r := range data {
-		byShort[k] = fileRecord{FullURL: r.FullURL, UserID: r.UserID, IsDeleted: r.IsDeleted}
-	}
-	raw, err := json.Marshal(byShort)
-	if err != nil {
-		return fmt.Errorf("serialize url error: %w", err)
-	}
-	file, err := os.OpenFile(s.filePath, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0755)
-	if err != nil {
-		return fmt.Errorf("open file error: %w", err)
-	}
-	defer func() { _ = file.Close() }()
-	if _, err = file.WriteString(string(raw)); err != nil {
-		return fmt.Errorf("write url to file error: %w", err)
-	}
-	return nil
-}
-
-func (s *Storage) GetByUserID(ctx context.Context, userID string) ([]UserURL, error) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-
-	data, err := s.readFromFile()
-	if err != nil {
-		return nil, fmt.Errorf("read from file error: %w", err)
-	}
-
-	var out []UserURL
-	for short, r := range data {
-		if r.UserID == userID {
-			out = append(out, UserURL{ShortPath: short, OriginalURL: r.FullURL})
-		}
-	}
-	return out, nil
-}
-
-// DeleteBatch проставляет флаг is_deleted у записей по списку short_path для указанного пользователя.
-func (s *Storage) DeleteBatch(ctx context.Context, userID string, shortPaths []string) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	data, err := s.readFromFile()
-	if err != nil {
-		return fmt.Errorf("read from file error: %w", err)
-	}
-
-	for _, shortPath := range shortPaths {
-		if entry, exists := data[shortPath]; exists && entry.UserID == userID {
-			entry.IsDeleted = true
-			data[shortPath] = entry
-		}
-	}
-
-	return s.writeToFile(data)
-}
-
-func (s *Storage) Ping(ctx context.Context) error {
-	// Проверяем доступность файла для записи
-	file, err := os.OpenFile(s.filePath, os.O_RDWR|os.O_CREATE, 0755)
-	if err != nil {
-		return fmt.Errorf("file storage not available: %w", err)
-	}
-	_ = file.Close()
-	return nil
+	logger.Log.Info("Database connection successful")
+	return db, nil
 }

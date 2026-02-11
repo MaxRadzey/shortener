@@ -8,18 +8,18 @@ import (
 
 	"github.com/MaxRadzey/shortener/internal/config"
 	"github.com/MaxRadzey/shortener/internal/models"
-	dbstorage "github.com/MaxRadzey/shortener/internal/storage"
+	"github.com/MaxRadzey/shortener/internal/repository"
 	"github.com/MaxRadzey/shortener/internal/utils"
 )
 
 type Service struct {
-	storage   dbstorage.URLStorage
+	repo      repository.URLRepository
 	appConfig config.Config
 }
 
-func NewService(storage dbstorage.URLStorage, appConfig config.Config) *Service {
+func NewService(repo repository.URLRepository, appConfig config.Config) *Service {
 	return &Service{
-		storage:   storage,
+		repo:      repo,
 		appConfig: appConfig,
 	}
 }
@@ -30,10 +30,10 @@ func (s *Service) CreateShortURL(longURL, userID string) (string, error) {
 		return "", fmt.Errorf("failed to generate short path: %w", err)
 	}
 
-	item := dbstorage.URLEntry{ShortPath: shortPath, FullURL: longURL, UserID: userID}
-	err = s.storage.Create(item)
+	item := models.URLEntry{ShortPath: shortPath, FullURL: longURL, UserID: userID}
+	err = s.repo.Create(item)
 	if err != nil {
-		var urlExistsErr *dbstorage.ErrURLAlreadyExists
+		var urlExistsErr *repository.ErrURLAlreadyExists
 		if errors.As(err, &urlExistsErr) {
 			existingURL := fmt.Sprintf("%s/%s", s.appConfig.ReturningAddress, urlExistsErr.ShortPath)
 			return existingURL, &ErrURLConflict{ShortURL: existingURL}
@@ -45,11 +45,11 @@ func (s *Service) CreateShortURL(longURL, userID string) (string, error) {
 }
 
 func (s *Service) GetLongURL(shortPath string) (string, error) {
-	longURL, err := s.storage.Get(shortPath)
+	longURL, err := s.repo.Get(shortPath)
 	if err != nil {
-		// Преобразуем ошибки storage в ошибки service для изоляции слоёв
-		var notFoundErr *dbstorage.ErrNotFound
-		var goneErr *dbstorage.ErrGone
+		// Преобразуем ошибки repository в ошибки service для изоляции слоёв
+		var notFoundErr *repository.ErrNotFound
+		var goneErr *repository.ErrGone
 		if errors.As(err, &notFoundErr) {
 			return "", &ErrNotFound{ShortPath: notFoundErr.ShortPath}
 		}
@@ -62,15 +62,15 @@ func (s *Service) GetLongURL(shortPath string) (string, error) {
 	return longURL, nil
 }
 
-// Ping проверяет соединение с хранилищем.
-// Возвращает ошибку, если хранилище недоступно.
+// Ping проверяет соединение с репозиторием.
+// Возвращает ошибку, если репозиторий недоступен.
 func (s *Service) Ping(ctx context.Context) error {
-	return s.storage.Ping(ctx)
+	return s.repo.Ping(ctx)
 }
 
 // CreateShortURLBatch создает короткие URL для множества URL в одном запросе.
 func (s *Service) CreateShortURLBatch(ctx context.Context, items []models.BatchRequestItem, userID string) ([]models.BatchResponseItem, error) {
-	entries := make([]dbstorage.URLEntry, 0, len(items))
+	entries := make([]models.URLEntry, 0, len(items))
 	responseItems := make([]models.BatchResponseItem, 0, len(items))
 
 	for _, item := range items {
@@ -79,7 +79,7 @@ func (s *Service) CreateShortURLBatch(ctx context.Context, items []models.BatchR
 			return nil, fmt.Errorf("failed to generate short path: %w", err)
 		}
 
-		entries = append(entries, dbstorage.URLEntry{
+		entries = append(entries, models.URLEntry{
 			ShortPath: shortPath,
 			FullURL:   item.OriginalURL,
 			UserID:    userID,
@@ -92,7 +92,7 @@ func (s *Service) CreateShortURLBatch(ctx context.Context, items []models.BatchR
 		})
 	}
 
-	err := s.storage.CreateBatch(ctx, entries)
+	err := s.repo.CreateBatch(ctx, entries)
 	if err != nil {
 		return nil, fmt.Errorf("failed to save batch URLs: %w", err)
 	}
@@ -103,7 +103,7 @@ func (s *Service) CreateShortURLBatch(ctx context.Context, items []models.BatchR
 // GetUserURLs возвращает все сокращённые пользователем URL.
 // При отсутствии записей — пустой слайс; хендлер в таком случае отдаёт 204.
 func (s *Service) GetUserURLs(ctx context.Context, userID string) ([]models.UserURLItem, error) {
-	rows, err := s.storage.GetByUserID(ctx, userID)
+	rows, err := s.repo.GetByUserID(ctx, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -174,7 +174,7 @@ func (s *Service) DeleteURLs(ctx context.Context, userID string, shortUrls []str
 	// Обрабатываем буферы batch update операциями
 	var lastErr error
 	for buffer := range bufferChan {
-		if err := s.storage.DeleteBatch(ctx, userID, buffer); err != nil {
+		if err := s.repo.DeleteBatch(ctx, userID, buffer); err != nil {
 			lastErr = fmt.Errorf("failed to delete batch: %w", err)
 			// Продолжаем обработку остальных буферов
 		}

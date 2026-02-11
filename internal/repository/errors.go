@@ -1,9 +1,6 @@
-package storage
+package repository
 
-import (
-	"context"
-	"fmt"
-)
+import "fmt"
 
 // ErrNotFound — ошибка, когда URL не найден в хранилище.
 type ErrNotFound struct {
@@ -31,28 +28,4 @@ type ErrGone struct {
 
 func (e *ErrGone) Error() string {
 	return fmt.Sprintf("url is deleted: %s", e.ShortPath)
-}
-
-// URLEntry — запись для создания URL.
-type URLEntry struct {
-	ShortPath string
-	FullURL   string
-	UserID    string
-	IsDeleted bool
-}
-
-// UserURL — short_path + original_url, используется в GetByUserID.
-type UserURL struct {
-	ShortPath   string
-	OriginalURL string
-}
-
-// URLStorage — интерфейс хранилища URL.
-type URLStorage interface {
-	Get(short string) (string, error)
-	Create(item URLEntry) error
-	CreateBatch(ctx context.Context, items []URLEntry) error
-	GetByUserID(ctx context.Context, userID string) ([]UserURL, error)
-	DeleteBatch(ctx context.Context, userID string, shortPaths []string) error
-	Ping(ctx context.Context) error
 }

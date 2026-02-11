@@ -1,0 +1,17 @@
+package repository
+
+import (
+	"context"
+
+	"github.com/MaxRadzey/shortener/internal/models"
+)
+
+// URLRepository — интерфейс репозитория URL.
+type URLRepository interface {
+	Get(short string) (string, error)
+	Create(item models.URLEntry) error
+	CreateBatch(ctx context.Context, items []models.URLEntry) error
+	GetByUserID(ctx context.Context, userID string) ([]models.UserURL, error)
+	DeleteBatch(ctx context.Context, userID string, shortPaths []string) error
+	Ping(ctx context.Context) error
+}

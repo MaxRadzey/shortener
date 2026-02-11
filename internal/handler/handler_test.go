@@ -12,9 +12,9 @@ import (
 	"github.com/MaxRadzey/shortener/internal/contextkeys"
 	"github.com/MaxRadzey/shortener/internal/handler"
 	"github.com/MaxRadzey/shortener/internal/models"
+	"github.com/MaxRadzey/shortener/internal/repository"
 	"github.com/MaxRadzey/shortener/internal/router"
 	"github.com/MaxRadzey/shortener/internal/service"
-	dbstorage "github.com/MaxRadzey/shortener/internal/storage"
 	teststorage "github.com/MaxRadzey/shortener/internal/testing"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
@@ -30,9 +30,9 @@ var testConfig = &config.Config{
 	SigningKey:       "dev-signing-key-change-in-production",
 }
 
-// setupTestHandler создает handler для тестов с указанным хранилищем.
-func setupTestHandler(storage dbstorage.URLStorage) *handler.Handler {
-	urlService := service.NewService(storage, *testConfig)
+// setupTestHandler создает handler для тестов с указанным репозиторием.
+func setupTestHandler(repo repository.URLRepository) *handler.Handler {
+	urlService := service.NewService(repo, *testConfig)
 	return &handler.Handler{Service: urlService}
 }
 
@@ -51,11 +51,11 @@ func assertResponse(t *testing.T, expected, actual string) {
 func TestGetURL(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	// Хранилище: обычная запись и удалённая (IsDeleted: true)
-	storage := teststorage.NewFakeStorageWithEntries(map[string]dbstorage.URLEntry{
+	repo := teststorage.NewFakeRepositoryWithEntries(map[string]models.URLEntry{
 		"XxLlqM": {ShortPath: "XxLlqM", FullURL: "https://vk.com", UserID: "", IsDeleted: false},
 		"AbCdEf": {ShortPath: "AbCdEf", FullURL: "https://ya.ru", UserID: "", IsDeleted: true},
 	})
-	h := setupTestHandler(storage)
+	h := setupTestHandler(repo)
 	rt := router.SetupRouter(h, testConfig)
 
 	type want struct {
@@ -122,8 +122,8 @@ func TestGetURL(t *testing.T) {
 
 func TestCreateURL(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	storage := teststorage.NewFakeStorageWithData(nil)
-	h := setupTestHandler(storage)
+	repo := teststorage.NewFakeRepositoryWithData(nil)
+	h := setupTestHandler(repo)
 	rt := router.SetupRouter(h, testConfig)
 
 	type want struct {
@@ -184,8 +184,8 @@ func TestCreateURL(t *testing.T) {
 
 func TestGetURLJSON(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	storage := teststorage.NewFakeStorageWithData(nil)
-	h := setupTestHandler(storage)
+	repo := teststorage.NewFakeRepositoryWithData(nil)
+	h := setupTestHandler(repo)
 	rt := router.SetupRouter(h, testConfig)
 
 	type want struct {
@@ -265,8 +265,8 @@ func TestGetURLJSON(t *testing.T) {
 
 func TestCreateURLBatch(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	storage := teststorage.NewFakeStorageWithData(nil)
-	h := setupTestHandler(storage)
+	repo := teststorage.NewFakeRepositoryWithData(nil)
+	h := setupTestHandler(repo)
 	rt := router.SetupRouter(h, testConfig)
 
 	type want struct {
@@ -389,13 +389,13 @@ func TestCreateURLBatch(t *testing.T) {
 func TestGetUserURLs(t *testing.T) {
 	// Создаем storage с данными для конкретного пользователя
 	userID := "test-user-id"
-	storage := teststorage.NewFakeStorageWithEntries(map[string]dbstorage.URLEntry{
+	repo := teststorage.NewFakeRepositoryWithEntries(map[string]models.URLEntry{
 		"XxLlqM": {ShortPath: "XxLlqM", FullURL: "https://vk.com", UserID: userID},
 		"AbCdEf": {ShortPath: "AbCdEf", FullURL: "https://ya.ru", UserID: userID},
 		"Other1": {ShortPath: "Other1", FullURL: "https://google.com", UserID: "other-user-id"},
 	})
 
-	h := setupTestHandler(storage)
+	h := setupTestHandler(repo)
 
 	type want struct {
 		code        int
@@ -469,11 +469,11 @@ func TestGetUserURLs(t *testing.T) {
 func TestDeleteURLs(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	userID := "550e8400-e29b-41d4-a716-446655440000"
-	storage := teststorage.NewFakeStorageWithEntries(map[string]dbstorage.URLEntry{
+	repo := teststorage.NewFakeRepositoryWithEntries(map[string]models.URLEntry{
 		"XxLlqM": {ShortPath: "XxLlqM", FullURL: "https://vk.com", UserID: userID},
 		"AbCdEf": {ShortPath: "AbCdEf", FullURL: "https://ya.ru", UserID: userID},
 	})
-	h := setupTestHandler(storage)
+	h := setupTestHandler(repo)
 
 	type want struct {
 		code int

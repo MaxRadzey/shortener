@@ -1,30 +1,32 @@
 package testing
 
 import (
-	dbstorage "github.com/MaxRadzey/shortener/internal/storage"
+	"github.com/MaxRadzey/shortener/internal/models"
+	"github.com/MaxRadzey/shortener/internal/repository"
+	"github.com/MaxRadzey/shortener/internal/repository/memory"
 )
 
-// NewFakeStorage создает новый экземпляр MemoryStorage с пустыми данными.
+// NewFakeRepository создает новый экземпляр MemoryRepository с пустыми данными.
 // Используется в тестах как легковесное in-memory хранилище.
-func NewFakeStorage() dbstorage.URLStorage {
-	return dbstorage.NewMemoryStorage()
+func NewFakeRepository() repository.URLRepository {
+	return memory.NewMemoryRepository()
 }
 
-// NewFakeStorageWithData создает MemoryStorage с предзаполненными данными.
+// NewFakeRepositoryWithData создает MemoryRepository с предзаполненными данными.
 // data - map[shortPath]fullURL
-func NewFakeStorageWithData(data map[string]string) dbstorage.URLStorage {
-	storage := dbstorage.NewMemoryStorage()
+func NewFakeRepositoryWithData(data map[string]string) repository.URLRepository {
+	repo := memory.NewMemoryRepository()
 	for short, fullURL := range data {
-		_ = storage.Create(dbstorage.URLEntry{ShortPath: short, FullURL: fullURL, UserID: ""})
+		_ = repo.Create(models.URLEntry{ShortPath: short, FullURL: fullURL, UserID: ""})
 	}
-	return storage
+	return repo
 }
 
-// NewFakeStorageWithEntries создает MemoryStorage с указанными записями.
-func NewFakeStorageWithEntries(entries map[string]dbstorage.URLEntry) dbstorage.URLStorage {
-	storage := dbstorage.NewMemoryStorage()
+// NewFakeRepositoryWithEntries создает MemoryRepository с указанными записями.
+func NewFakeRepositoryWithEntries(entries map[string]models.URLEntry) repository.URLRepository {
+	repo := memory.NewMemoryRepository()
 	for _, entry := range entries {
-		_ = storage.Create(entry)
+		_ = repo.Create(entry)
 	}
-	return storage
+	return repo
 }

@@ -6,7 +6,7 @@ import (
 	"github.com/MaxRadzey/shortener/internal/logger"
 	"github.com/MaxRadzey/shortener/internal/router"
 	"github.com/MaxRadzey/shortener/internal/service"
-	dbstorage "github.com/MaxRadzey/shortener/internal/storage"
+	"github.com/MaxRadzey/shortener/internal/storage"
 	"go.uber.org/zap"
 )
 
@@ -16,12 +16,12 @@ func Run(AppConfig *config.Config) error {
 		return err
 	}
 
-	storageResult, err := dbstorage.InitializeStorage(AppConfig.DatabaseDSN, AppConfig.FilePath)
+	storageResult, err := storage.InitializeStorage(AppConfig.DatabaseDSN, AppConfig.FilePath)
 	if err != nil {
 		return err
 	}
 
-	urlService := service.NewService(storageResult.Storage, *AppConfig)
+	urlService := service.NewService(storageResult.Repository, *AppConfig)
 	h := &httphandlers.Handler{Service: urlService}
 
 	r := router.SetupRouter(h, AppConfig)
