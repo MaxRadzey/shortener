@@ -14,6 +14,10 @@ type Config struct {
 	// SigningKey — секрет для HMAC-подписи куки (не шифрование). Кука = base64(userID).base64(hmac).
 	// В проде обязательно задавать через SECRET_KEY; дефолт — только для локальной разработки.
 	SigningKey string
+	// AuditFile — путь к файлу для логов аудита. Пусто = аудит в файл отключён.
+	AuditFile string
+	// AuditURL — URL удалённого сервера-приёмника для логов аудита. Пусто = аудит на удалённый сервер отключён.
+	AuditURL string
 }
 
 func New() *Config {
@@ -46,6 +50,12 @@ func ParseEnv(config *Config) {
 	if v := os.Getenv("SECRET_KEY"); v != "" {
 		config.SigningKey = v
 	}
+	if v := os.Getenv("AUDIT_FILE"); v != "" {
+		config.AuditFile = v
+	}
+	if v := os.Getenv("AUDIT_URL"); v != "" {
+		config.AuditURL = v
+	}
 }
 
 // ParseFlags парсит флаги командной строки и обновляет конфигурацию.
@@ -56,6 +66,8 @@ func ParseFlags(config *Config) {
 	flag.StringVar(&config.LogLevel, "l", config.LogLevel, "log level")
 	flag.StringVar(&config.FilePath, "f", config.FilePath, "file path")
 	flag.StringVar(&config.DatabaseDSN, "d", config.DatabaseDSN, "database connection string")
+	flag.StringVar(&config.AuditFile, "audit-file", config.AuditFile, "path to audit log file (empty = disabled)")
+	flag.StringVar(&config.AuditURL, "audit-url", config.AuditURL, "URL of remote audit receiver (empty = disabled)")
 
 	flag.Parse()
 }

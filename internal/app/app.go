@@ -1,6 +1,7 @@
 package app
 
 import (
+	"github.com/MaxRadzey/shortener/internal/audit"
 	"github.com/MaxRadzey/shortener/internal/config"
 	httphandlers "github.com/MaxRadzey/shortener/internal/handler"
 	"github.com/MaxRadzey/shortener/internal/logger"
@@ -22,7 +23,8 @@ func Run(AppConfig *config.Config) error {
 	}
 
 	urlService := service.NewService(storageResult.Repository, *AppConfig)
-	h := &httphandlers.Handler{Service: urlService}
+	auditNotifier := audit.NewNotifier(AppConfig.AuditFile, AppConfig.AuditURL)
+	h := &httphandlers.Handler{Service: urlService, Audit: auditNotifier}
 
 	r := router.SetupRouter(h, AppConfig)
 

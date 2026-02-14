@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 
+	"github.com/MaxRadzey/shortener/internal/audit"
 	"github.com/MaxRadzey/shortener/internal/contextkeys"
 	"github.com/MaxRadzey/shortener/internal/logger"
 	"github.com/MaxRadzey/shortener/internal/models"
@@ -18,6 +19,7 @@ import (
 
 type Handler struct {
 	Service *service.Service
+	Audit   *audit.Notifier
 }
 
 // userIDFromContext возвращает user_id из контекста. ok == false, если нет или пусто.
@@ -92,6 +94,9 @@ func (h *Handler) CreateURL(c *gin.Context) {
 		// Проверяем, является ли ошибка конфликтом существующего URL
 		var conflictErr *service.ErrURLConflict
 		if errors.As(err, &conflictErr) {
+			if h.Audit != nil {
+				h.Audit.Notify(audit.NewEvent("shorten", userID, text))
+			}
 			c.Header("Content-Type", "text/plain; charset=utf-8")
 			c.String(http.StatusConflict, conflictErr.ShortURL)
 			return
@@ -101,6 +106,9 @@ func (h *Handler) CreateURL(c *gin.Context) {
 		return
 	}
 
+	if h.Audit != nil {
+		h.Audit.Notify(audit.NewEvent("shorten", userID, text))
+	}
 	c.Header("Content-Type", "text/plain; charset=utf-8")
 	c.String(http.StatusCreated, result)
 }
@@ -122,6 +130,10 @@ func (h *Handler) GetURL(c *gin.Context) {
 		return
 	}
 
+	userID, _ := h.userIDFromContext(c)
+	if h.Audit != nil {
+		h.Audit.Notify(audit.NewEvent("follow", userID, longURL))
+	}
 	c.Redirect(http.StatusTemporaryRedirect, longURL)
 }
 
@@ -147,6 +159,9 @@ func (h *Handler) GetURLJSON(c *gin.Context) {
 		// Проверяем, является ли ошибка конфликтом существующего URL
 		var conflictErr *service.ErrURLConflict
 		if errors.As(err, &conflictErr) {
+			if h.Audit != nil {
+				h.Audit.Notify(audit.NewEvent("shorten", userID, req.URL))
+			}
 			resp := models.Response{Result: conflictErr.ShortURL}
 			h.sendJSONResponse(c, http.StatusConflict, resp)
 			return
@@ -156,6 +171,9 @@ func (h *Handler) GetURLJSON(c *gin.Context) {
 		return
 	}
 
+	if h.Audit != nil {
+		h.Audit.Notify(audit.NewEvent("shorten", userID, req.URL))
+	}
 	resp := models.Response{Result: result}
 	h.sendJSONResponse(c, http.StatusCreated, resp)
 }
