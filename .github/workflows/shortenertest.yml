@@ -308,7 +308,7 @@ jobs:
           github.head_ref == 'iter23' ||
           github.head_ref == 'iter24'
         run: |
-          TEMP_FILE=data.json
+          TEMP_FILE=$(random tempfile)
           shortenertestbeta -test.v -test.run=^TestIteration9$ \
               -binary-path=cmd/shortener/shortener \
               -source-path=. \
