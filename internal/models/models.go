@@ -1,3 +1,4 @@
+// Package models содержит DTO для API (запросы, ответы, элементы batch).
 package models
 
 // Request — тело запроса POST /api/shorten.

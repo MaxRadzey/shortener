@@ -1,3 +1,4 @@
+// Package audit — события аудита и рассылка по наблюдателям (файл, удалённый URL).
 package audit
 
 import "time"

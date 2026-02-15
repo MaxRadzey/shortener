@@ -1,3 +1,4 @@
+// Package file реализует URLRepository с хранением данных в одном JSON-файле.
 package file
 
 import (
@@ -75,6 +76,7 @@ func (s *FileRepository) readFromFile() (map[string]models.URLEntry, error) {
 	return res, nil
 }
 
+// Create сохраняет запись в файл.
 func (s *FileRepository) Create(item models.URLEntry) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -88,6 +90,7 @@ func (s *FileRepository) Create(item models.URLEntry) error {
 	return s.writeToFile(data)
 }
 
+// Get возвращает оригинальный URL по short path; ErrNotFound или ErrGone при отсутствии или удалении.
 func (s *FileRepository) Get(id string) (string, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -107,6 +110,7 @@ func (s *FileRepository) Get(id string) (string, error) {
 	return r.FullURL, nil
 }
 
+// CreateBatch сохраняет пачку записей в файле.
 func (s *FileRepository) CreateBatch(ctx context.Context, items []models.URLEntry) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -143,6 +147,7 @@ func (s *FileRepository) writeToFile(data map[string]models.URLEntry) error {
 	return nil
 }
 
+// GetByUserID возвращает все записи пользователя.
 func (s *FileRepository) GetByUserID(ctx context.Context, userID string) ([]models.UserURL, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -181,6 +186,7 @@ func (s *FileRepository) DeleteBatch(ctx context.Context, userID string, shortPa
 	return s.writeToFile(data)
 }
 
+// Ping проверяет доступность файла для чтения и записи.
 func (s *FileRepository) Ping(ctx context.Context) error {
 	// Проверяем доступность файла для записи
 	file, err := os.OpenFile(s.filePath, os.O_RDWR|os.O_CREATE, 0755)

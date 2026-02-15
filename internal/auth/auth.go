@@ -1,3 +1,4 @@
+// Package auth предоставляет функции работы с кукой пользователя (создание, проверка подписи).
 package auth
 
 import (
@@ -11,6 +12,7 @@ import (
 	"github.com/google/uuid"
 )
 
+// CookieName — имя куки с идентификатором пользователя.
 const CookieName = "user_id"
 
 // GetOrCreateUser: если куки нет — создаёт пользователя, ставит куку, возвращает (userID, false).

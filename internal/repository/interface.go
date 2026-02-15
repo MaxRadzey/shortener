@@ -1,3 +1,4 @@
+// Package repository задаёт интерфейс хранилища URL и типы ошибок.
 package repository
 
 import (

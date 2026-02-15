@@ -1,3 +1,4 @@
+// Package handler содержит HTTP-хендлеры эндпоинтов коротких ссылок.
 package handler
 
 import (

@@ -1,3 +1,4 @@
+// Package router настраивает маршруты и middleware для HTTP-сервера.
 package router
 
 import (

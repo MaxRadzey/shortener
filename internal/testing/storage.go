@@ -1,3 +1,4 @@
+// Package testing содержит хелперы для тестов (фейковые репозитории).
 package testing
 
 import (

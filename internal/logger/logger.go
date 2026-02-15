@@ -1,3 +1,4 @@
+// Package logger настраивает глобальный zap-логгер и HTTP-логирование запросов.
 package logger
 
 import (
@@ -10,24 +11,26 @@ import (
 // Log — глобальный логгер; инициализируется через Initialize.
 var Log *zap.Logger = zap.NewNop()
 
-type (
-	responseData struct {
-		status int
-		size   int
-	}
+// responseData хранит статус и размер ответа для логгера.
+type responseData struct {
+	status int
+	size   int
+}
 
-	loggingResponseWriter struct {
-		gin.ResponseWriter
-		responseData *responseData
-	}
-)
+// loggingResponseWriter оборачивает ResponseWriter для подсчёта размера и статуса.
+type loggingResponseWriter struct {
+	gin.ResponseWriter
+	responseData *responseData
+}
 
+// Write записывает данные и учитывает размер в responseData.
 func (r *loggingResponseWriter) Write(b []byte) (int, error) {
 	size, err := r.ResponseWriter.Write(b)
 	r.responseData.size += size
 	return size, err
 }
 
+// WriteHeader сохраняет статус в responseData и вызывает WriteHeader ниже по цепочке.
 func (r *loggingResponseWriter) WriteHeader(statusCode int) {
 	r.ResponseWriter.WriteHeader(statusCode)
 	r.responseData.status = statusCode

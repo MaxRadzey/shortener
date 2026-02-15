@@ -1,3 +1,4 @@
+// Package service реализует бизнес-логику сокращения ссылок и пакетного удаления.
 package service
 
 import (

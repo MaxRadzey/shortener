@@ -7,6 +7,7 @@ type ErrNotFound struct {
 	ShortPath string
 }
 
+// Error возвращает текстовое представление ошибки.
 func (e *ErrNotFound) Error() string {
 	return fmt.Sprintf("url not found with short_path: %s", e.ShortPath)
 }
@@ -16,6 +17,7 @@ type ErrURLAlreadyExists struct {
 	ShortPath string
 }
 
+// Error возвращает текстовое представление ошибки.
 func (e *ErrURLAlreadyExists) Error() string {
 	return fmt.Sprintf("url already exists with short_path: %s", e.ShortPath)
 }
@@ -25,6 +27,7 @@ type ErrGone struct {
 	ShortPath string
 }
 
+// Error возвращает текстовое представление ошибки.
 func (e *ErrGone) Error() string {
 	return fmt.Sprintf("url is deleted: %s", e.ShortPath)
 }

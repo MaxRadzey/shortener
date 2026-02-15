@@ -1,3 +1,4 @@
+// Package postgres реализует URLRepository для хранения данных в PostgreSQL.
 package postgres
 
 import (
@@ -34,6 +35,7 @@ func NewPostgresRepository(db *pgxpool.Pool) (*PostgresRepository, error) {
 	}, nil
 }
 
+// Get возвращает оригинальный URL по short path; ErrNotFound или ErrGone при отсутствии или удалении.
 func (p *PostgresRepository) Get(short string) (string, error) {
 	ctx := context.Background()
 	var originalURL string
@@ -54,6 +56,7 @@ func (p *PostgresRepository) Get(short string) (string, error) {
 	return originalURL, nil
 }
 
+// Create сохраняет запись в БД; при дубликате original_url возвращает ErrURLAlreadyExists.
 func (p *PostgresRepository) Create(item models.URLEntry) error {
 	ctx := context.Background()
 
@@ -74,6 +77,7 @@ func (p *PostgresRepository) Create(item models.URLEntry) error {
 	return nil
 }
 
+// CreateBatch сохраняет пачку записей в одной транзакции.
 func (p *PostgresRepository) CreateBatch(ctx context.Context, items []models.URLEntry) error {
 	// Используем транзакцию для атомарности
 	tx, err := p.db.Begin(ctx)
@@ -112,6 +116,7 @@ func (p *PostgresRepository) CreateBatch(ctx context.Context, items []models.URL
 
 const defaultUserURLsCap = 64
 
+// GetByUserID возвращает все записи пользователя из БД.
 func (p *PostgresRepository) GetByUserID(ctx context.Context, userID string) ([]models.UserURL, error) {
 	rows, err := p.db.Query(ctx, "SELECT short_path, original_url FROM urls WHERE user_id = $1", userID)
 	if err != nil {
@@ -172,6 +177,7 @@ func (p *PostgresRepository) DeleteBatch(ctx context.Context, userID string, sho
 	return nil
 }
 
+// Ping проверяет соединение с БД.
 func (p *PostgresRepository) Ping(ctx context.Context) error {
 	return p.db.Ping(ctx)
 }

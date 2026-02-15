@@ -1,3 +1,4 @@
+// Package main — точка входа: парсит конфиг и запускает HTTP-сервер коротких ссылок.
 package main
 
 import (

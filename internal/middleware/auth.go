@@ -1,3 +1,4 @@
+// Package middleware содержит Gin middleware: аутентификация по куке, gzip.
 package middleware
 
 import (

@@ -1,3 +1,4 @@
+// Package storage инициализирует хранилище (postgres / file / memory) и миграции.
 package storage
 
 import (

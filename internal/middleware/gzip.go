@@ -9,19 +9,23 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+// compressWriter оборачивает ResponseWriter и пишет данные через gzip.Writer.
 type compressWriter struct {
 	gin.ResponseWriter
 	Writer *gzip.Writer
 }
 
+// Write сжимает и записывает данные в gzip-поток.
 func (c *compressWriter) Write(data []byte) (int, error) {
 	return c.Writer.Write(data)
 }
 
+// Close закрывает gzip-поток.
 func (c *compressWriter) Close() error {
 	return c.Writer.Close()
 }
 
+// WriteString записывает строку в gzip-поток.
 func (c *compressWriter) WriteString(s string) (int, error) {
 	return c.Writer.Write([]byte(s))
 }

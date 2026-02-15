@@ -1,3 +1,4 @@
+// Package utils — хелперы: короткий хеш URL, валидация URL, маскировка DSN для логов.
 package utils
 
 import (

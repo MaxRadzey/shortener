@@ -1,3 +1,4 @@
+// Package config загружает настройки приложения из флагов и переменных окружения.
 package config
 
 import (
@@ -7,11 +8,11 @@ import (
 
 // Config — настройки приложения (адрес, БД, файл, логи, аудит, ключ подписи).
 type Config struct {
-	Address          string
-	ReturningAddress string
-	LogLevel         string
-	FilePath         string
-	DatabaseDSN      string
+	Address          string // адрес сервера (например :8080)
+	ReturningAddress string // базовый URL для коротких ссылок в ответах
+	LogLevel         string // уровень логов (info, debug и т.д.)
+	FilePath         string // путь к файлу хранилища, если не используется БД
+	DatabaseDSN      string // строка подключения к PostgreSQL; пусто — БД не используется
 	// SigningKey — секрет для подписи куки (в проде задавать через SECRET_KEY).
 	SigningKey string
 	AuditFile  string // путь к файлу аудита; пусто — выключено

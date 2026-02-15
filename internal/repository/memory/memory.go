@@ -1,3 +1,4 @@
+// Package memory реализует URLRepository с хранением данных в памяти (map).
 package memory
 
 import (
@@ -21,6 +22,7 @@ func NewMemoryRepository() *MemoryRepository {
 	}
 }
 
+// Get возвращает оригинальный URL по short path; ErrNotFound или ErrGone при отсутствии или удалении.
 func (m *MemoryRepository) Get(short string) (string, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
@@ -35,6 +37,7 @@ func (m *MemoryRepository) Get(short string) (string, error) {
 	return r.FullURL, nil
 }
 
+// Create сохраняет запись в памяти.
 func (m *MemoryRepository) Create(item models.URLEntry) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -43,6 +46,7 @@ func (m *MemoryRepository) Create(item models.URLEntry) error {
 	return nil
 }
 
+// CreateBatch сохраняет пачку записей в памяти.
 func (m *MemoryRepository) CreateBatch(ctx context.Context, items []models.URLEntry) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -53,6 +57,7 @@ func (m *MemoryRepository) CreateBatch(ctx context.Context, items []models.URLEn
 	return nil
 }
 
+// GetByUserID возвращает все записи пользователя.
 func (m *MemoryRepository) GetByUserID(ctx context.Context, userID string) ([]models.UserURL, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
@@ -66,6 +71,7 @@ func (m *MemoryRepository) GetByUserID(ctx context.Context, userID string) ([]mo
 	return out, nil
 }
 
+// DeleteBatch проставляет is_deleted у записей пользователя по списку short path.
 func (m *MemoryRepository) DeleteBatch(ctx context.Context, userID string, shortPaths []string) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -81,6 +87,7 @@ func (m *MemoryRepository) DeleteBatch(ctx context.Context, userID string, short
 	return nil
 }
 
+// Ping для in-memory всегда возвращает nil (хранилище доступно).
 func (m *MemoryRepository) Ping(ctx context.Context) error {
 	// In-memory хранилище всегда доступно
 	return nil
