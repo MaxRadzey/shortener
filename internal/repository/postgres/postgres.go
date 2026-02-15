@@ -108,6 +108,8 @@ func (p *PostgresRepository) CreateBatch(ctx context.Context, items []models.URL
 	return nil
 }
 
+const defaultUserURLsCap = 64
+
 func (p *PostgresRepository) GetByUserID(ctx context.Context, userID string) ([]models.UserURL, error) {
 	rows, err := p.db.Query(ctx, "SELECT short_path, original_url FROM urls WHERE user_id = $1", userID)
 	if err != nil {
@@ -115,7 +117,7 @@ func (p *PostgresRepository) GetByUserID(ctx context.Context, userID string) ([]
 	}
 	defer rows.Close()
 
-	var out []models.UserURL
+	out := make([]models.UserURL, 0, defaultUserURLsCap)
 	for rows.Next() {
 		var u models.UserURL
 		if err := rows.Scan(&u.ShortPath, &u.OriginalURL); err != nil {

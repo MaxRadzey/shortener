@@ -22,6 +22,10 @@ type Handler struct {
 	Audit   *audit.Notifier
 }
 
+type errResp struct {
+	Error string `json:"error"`
+}
+
 // userIDFromContext возвращает user_id из контекста. ok == false, если нет или пусто.
 func (h *Handler) userIDFromContext(c *gin.Context) (userID string, ok bool) {
 	v, _ := c.Get(contextkeys.UserIDKey)
@@ -43,7 +47,7 @@ func (h *Handler) requireUserID(c *gin.Context) (userID string, ok bool) {
 
 // sendErrorJSON отправляет JSON ответ с ошибкой в формате {"error": "..."}
 func (h *Handler) sendErrorJSON(c *gin.Context, statusCode int, errorMsg string) {
-	c.JSON(statusCode, gin.H{"error": errorMsg})
+	c.JSON(statusCode, errResp{Error: errorMsg})
 }
 
 // sendJSONResponse отправляет JSON ответ и обрабатывает ошибки кодирования

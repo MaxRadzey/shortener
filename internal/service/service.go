@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"sync"
 
 	"github.com/MaxRadzey/shortener/internal/config"
@@ -24,6 +25,16 @@ func NewService(repo repository.URLRepository, appConfig config.Config) *Service
 	}
 }
 
+// buildShortURL собирает полный short URL без fmt.Sprintf для меньших аллокаций.
+func (s *Service) buildShortURL(shortPath string) string {
+	var b strings.Builder
+	b.Grow(len(s.appConfig.ReturningAddress) + 1 + len(shortPath))
+	b.WriteString(s.appConfig.ReturningAddress)
+	b.WriteByte('/')
+	b.WriteString(shortPath)
+	return b.String()
+}
+
 func (s *Service) CreateShortURL(longURL, userID string) (string, error) {
 	shortPath, err := utils.GetShortPath(longURL)
 	if err != nil {
@@ -35,13 +46,13 @@ func (s *Service) CreateShortURL(longURL, userID string) (string, error) {
 	if err != nil {
 		var urlExistsErr *repository.ErrURLAlreadyExists
 		if errors.As(err, &urlExistsErr) {
-			existingURL := fmt.Sprintf("%s/%s", s.appConfig.ReturningAddress, urlExistsErr.ShortPath)
+			existingURL := s.buildShortURL(urlExistsErr.ShortPath)
 			return existingURL, &ErrURLConflict{ShortURL: existingURL}
 		}
 		return "", fmt.Errorf("failed to save URL: %w", err)
 	}
 
-	return fmt.Sprintf("%s/%s", s.appConfig.ReturningAddress, shortPath), nil
+	return s.buildShortURL(shortPath), nil
 }
 
 func (s *Service) GetLongURL(shortPath string) (string, error) {
@@ -85,10 +96,9 @@ func (s *Service) CreateShortURLBatch(ctx context.Context, items []models.BatchR
 			UserID:    userID,
 		})
 
-		shortURL := fmt.Sprintf("%s/%s", s.appConfig.ReturningAddress, shortPath)
 		responseItems = append(responseItems, models.BatchResponseItem{
 			CorrelationID: item.CorrelationID,
-			ShortURL:      shortURL,
+			ShortURL:      s.buildShortURL(shortPath),
 		})
 	}
 
@@ -110,7 +120,7 @@ func (s *Service) GetUserURLs(ctx context.Context, userID string) ([]models.User
 	out := make([]models.UserURLItem, 0, len(rows))
 	for _, r := range rows {
 		out = append(out, models.UserURLItem{
-			ShortURL:    fmt.Sprintf("%s/%s", s.appConfig.ReturningAddress, r.ShortPath),
+			ShortURL:    s.buildShortURL(r.ShortPath),
 			OriginalURL: r.OriginalURL,
 		})
 	}

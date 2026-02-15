@@ -50,38 +50,19 @@ func Initialize(level string) error {
 	return nil
 }
 
-func RequestLogger() gin.HandlerFunc {
+func HTTPLogger() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		start := time.Now()
-
+		rd := &responseData{status: 0, size: 0}
+		c.Writer = &loggingResponseWriter{ResponseWriter: c.Writer, responseData: rd}
 		c.Next()
-
-		duration := time.Since(start)
-		Log.Info("got incoming HTTP request",
-			zap.String("URI", c.Request.RequestURI),
+		Log.Info("request",
 			zap.String("method", c.Request.Method),
-			zap.Duration("duration", duration),
+			zap.String("path", c.Request.URL.Path),
+			zap.Int("status", rd.status),
+			zap.Int("size", rd.size),
+			zap.Duration("duration", time.Since(start)),
 		)
 	}
 }
 
-func ResponseLogger() gin.HandlerFunc {
-	return func(c *gin.Context) {
-		responseData := &responseData{
-			status: 0,
-			size:   0,
-		}
-
-		lw := &loggingResponseWriter{
-			ResponseWriter: c.Writer,
-			responseData:   responseData,
-		}
-		c.Writer = lw
-		c.Next()
-
-		Log.Info("response",
-			zap.Int("status", lw.responseData.status),
-			zap.Int("size", lw.responseData.size),
-		)
-	}
-}
