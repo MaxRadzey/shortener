@@ -8,11 +8,13 @@ import (
 	"github.com/MaxRadzey/shortener/internal/repository"
 )
 
+// MemoryRepository хранит URL в памяти (map).
 type MemoryRepository struct {
 	mu   sync.RWMutex
 	data map[string]models.URLEntry
 }
 
+// NewMemoryRepository возвращает пустой in-memory репозиторий.
 func NewMemoryRepository() *MemoryRepository {
 	return &MemoryRepository{
 		data: make(map[string]models.URLEntry),

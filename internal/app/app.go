@@ -11,7 +11,7 @@ import (
 	"go.uber.org/zap"
 )
 
-// Run запускает http сервер.
+// Run инициализирует логгер, хранилище, сервис, хендлеры и запускает HTTP-сервер.
 func Run(AppConfig *config.Config) error {
 	if err := logger.Initialize(AppConfig.LogLevel); err != nil {
 		return err

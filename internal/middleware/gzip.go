@@ -26,7 +26,7 @@ func (c *compressWriter) WriteString(s string) (int, error) {
 	return c.Writer.Write([]byte(s))
 }
 
-// Gzip обрабатывает сжатие и распаковку gzip для HTTP запросов и ответов.
+// Gzip сжимает ответы при Accept-Encoding: gzip и распаковывает тело запроса при Content-Encoding: gzip.
 func Gzip() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		acceptEncoding := c.GetHeader("Accept-Encoding")

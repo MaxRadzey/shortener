@@ -1,6 +1,6 @@
 package audit
 
-// Observer — приёмник событий аудита.
+// Observer — приёмник событий аудита (файл, удалённый сервер и т.д.).
 type Observer interface {
 	Notify(event Event)
 }
@@ -10,8 +10,7 @@ type Notifier struct {
 	observers []Observer
 }
 
-// NewNotifier создаёт нотифаер с наблюдателями по конфигу.
-// Если AuditFile задан — добавляется FileReceiver, если AuditURL — RemoteReceiver.
+// NewNotifier создаёт нотифаер: при auditFile — пишет в файл, при auditURL — шлёт на URL.
 func NewNotifier(auditFile, auditURL string) *Notifier {
 	var observers []Observer
 	if auditFile != "" {
@@ -23,7 +22,7 @@ func NewNotifier(auditFile, auditURL string) *Notifier {
 	return &Notifier{observers: observers}
 }
 
-// Notify отправляет событие во все приёмники.
+// Notify рассылает событие всем наблюдателям.
 func (n *Notifier) Notify(event Event) {
 	for _, o := range n.observers {
 		o.Notify(event)

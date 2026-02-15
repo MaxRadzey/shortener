@@ -12,13 +12,13 @@ import (
 
 const remoteTimeout = 10 * time.Second
 
-// RemoteReceiver отправляет события аудита на удалённый сервер методом POST.
+// RemoteReceiver шлёт события на удалённый URL методом POST (асинхронно).
 type RemoteReceiver struct {
 	url    string
 	client *http.Client
 }
 
-// NewRemoteReceiver создаёт приёмник отправки на удалённый URL.
+// NewRemoteReceiver возвращает приёмник для указанного URL.
 func NewRemoteReceiver(url string) *RemoteReceiver {
 	return &RemoteReceiver{
 		url: url,
@@ -28,7 +28,7 @@ func NewRemoteReceiver(url string) *RemoteReceiver {
 	}
 }
 
-// Notify отправляет событие POST на сконфигурированный URL.
+// Notify отправляет событие POST на URL в горутине.
 func (r *RemoteReceiver) Notify(event Event) {
 	go func() {
 		data, err := json.Marshal(event)

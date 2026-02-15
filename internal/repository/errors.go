@@ -20,8 +20,7 @@ func (e *ErrURLAlreadyExists) Error() string {
 	return fmt.Sprintf("url already exists with short_path: %s", e.ShortPath)
 }
 
-// ErrGone — ошибка, когда URL найден, но помечен как удалённый (is_deleted).
-// Используется для возврата 410 Gone только в хендлере GET /{id}.
+// ErrGone — запись найдена, но помечена удалённой (is_deleted).
 type ErrGone struct {
 	ShortPath string
 }

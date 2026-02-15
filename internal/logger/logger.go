@@ -7,6 +7,7 @@ import (
 	"go.uber.org/zap"
 )
 
+// Log — глобальный логгер; инициализируется через Initialize.
 var Log *zap.Logger = zap.NewNop()
 
 type (
@@ -32,6 +33,7 @@ func (r *loggingResponseWriter) WriteHeader(statusCode int) {
 	r.responseData.status = statusCode
 }
 
+// Initialize настраивает глобальный логгер по уровню (info, debug и т.д.).
 func Initialize(level string) error {
 	lvl, err := zap.ParseAtomicLevel(level)
 	if err != nil {
@@ -50,6 +52,7 @@ func Initialize(level string) error {
 	return nil
 }
 
+// HTTPLogger — middleware, логирующий метод, путь, статус, размер и время запроса.
 func HTTPLogger() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		start := time.Now()

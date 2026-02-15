@@ -13,17 +13,13 @@ import (
 	"go.uber.org/zap"
 )
 
-// StorageResult содержит результат инициализации хранилища.
+// StorageResult — репозиторий и при необходимости пул БД (для postgres).
 type StorageResult struct {
 	Repository repository.URLRepository
 	DB         *pgxpool.Pool
 }
 
-// InitializeStorage выбирает и инициализирует хранилище согласно приоритетам:
-// 1. PostgreSQL (если указан DATABASE_DSN)
-// 2. Файловое хранилище (если указан FILE_PATH)
-// 3. In-memory (fallback)
-// Возвращает выбранный репозиторий и пул соединений БД (может быть nil).
+// InitializeStorage поднимает хранилище: приоритет DSN → file → memory.
 func InitializeStorage(databaseDSN, filePath string) (*StorageResult, error) {
 	var repo repository.URLRepository
 	var db *pgxpool.Pool

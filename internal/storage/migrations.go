@@ -14,7 +14,7 @@ import (
 	"go.uber.org/zap"
 )
 
-// RunMigrations запускает миграции базы данных из директории migrations.
+// RunMigrations применяет SQL-миграции к БД (dsn); migrationsPath по умолчанию "migrations".
 func RunMigrations(dsn string, migrationsPath string) error {
 	if dsn == "" {
 		return nil

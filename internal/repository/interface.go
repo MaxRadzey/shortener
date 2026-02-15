@@ -6,7 +6,7 @@ import (
 	"github.com/MaxRadzey/shortener/internal/models"
 )
 
-// URLRepository — интерфейс репозитория URL.
+// URLRepository — контракт хранилища: Get/Create/CreateBatch, GetByUserID, DeleteBatch, Ping.
 type URLRepository interface {
 	Get(short string) (string, error)
 	Create(item models.URLEntry) error

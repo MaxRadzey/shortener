@@ -10,7 +10,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// SetupRouter создает и настраивает HTTP роутер со всеми middleware и маршрутами.
+// SetupRouter создаёт роутер с логгером, gzip, auth и маршрутами коротких ссылок.
 func SetupRouter(h *handler.Handler, cfg *config.Config) *gin.Engine {
 	r := gin.Default()
 	r.HandleMethodNotAllowed = true
@@ -33,7 +33,7 @@ func SetupRouter(h *handler.Handler, cfg *config.Config) *gin.Engine {
 	return r
 }
 
-// SetupMiddleware настраивает middleware для роутера.
+// SetupMiddleware вешает обработку NoMethod (405) на роутер.
 func SetupMiddleware(router *gin.Engine) {
 	router.NoMethod(func(c *gin.Context) {
 		c.JSON(http.StatusMethodNotAllowed, gin.H{"error": "Method not allowed"})

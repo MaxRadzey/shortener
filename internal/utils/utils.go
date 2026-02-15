@@ -19,9 +19,7 @@ var (
 	}
 )
 
-// GetShortPath возвращает короткое уникальное строковое представление пути (URL),
-// который был передан. Использует алгоритм шифрования sha1 и кодирование base64.
-// Результат обрезается до 6 символов. Переиспользует hasher и буфер через sync.Pool.
+// GetShortPath по строке (URL) возвращает короткий идентификатор (sha1+base64, 6 символов).
 func GetShortPath(path string) (string, error) {
 	if strings.TrimSpace(path) == "" {
 		return "", errors.New("empty string cannot be shortened")
@@ -39,15 +37,13 @@ func GetShortPath(path string) (string, error) {
 	return string(buf[:6]), nil
 }
 
-// IsValidURL валидирует переданную строку и возвращает булево значение True,
-// если строка - валидный URL, иначе False.
+// IsValidURL проверяет, что строка — валидный URL.
 func IsValidURL(urlToCheck string) bool {
 	_, err := url.ParseRequestURI(urlToCheck)
 	return err == nil
 }
 
-// MaskDSN скрывает пароль в DSN для безопасного логирования.
-// Простая маскировка - скрываем пароль после @
+// MaskDSN возвращает DSN с замаскированным паролем для логов.
 // postgres://user:password@host:port/db -> postgres://user:***@host:port/db
 func MaskDSN(dsn string) string {
 	if idx := strings.Index(dsn, "@"); idx > 0 {

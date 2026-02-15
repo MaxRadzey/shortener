@@ -9,18 +9,18 @@ import (
 	"go.uber.org/zap"
 )
 
-// FileReceiver записывает события аудита в файл (append, по одной строке на событие).
+// FileReceiver пишет события в файл по одной строке (append).
 type FileReceiver struct {
 	path string
 	mu   sync.Mutex
 }
 
-// NewFileReceiver создаёт приёмник записи в файл.
+// NewFileReceiver возвращает приёмник для записи в указанный файл.
 func NewFileReceiver(path string) *FileReceiver {
 	return &FileReceiver{path: path}
 }
 
-// Notify дописывает событие в конец файла на новой строке.
+// Notify дописывает JSON события в конец файла.
 func (f *FileReceiver) Notify(event Event) {
 	f.mu.Lock()
 	defer f.mu.Unlock()

@@ -19,7 +19,7 @@ import (
 
 const cookieName = "user_id"
 
-// Auth — middleware для аутентификации пользователя.
+// Auth выставляет в контексте user_id из куки или создаёт нового пользователя и ставит куку.
 func Auth(secretKey string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var userID string

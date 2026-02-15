@@ -1,6 +1,6 @@
 package models
 
-// URLEntry — запись для создания URL в репозитории.
+// URLEntry — одна запись URL в хранилище (short path, full URL, владелец, флаг удаления).
 type URLEntry struct {
 	ShortPath string
 	FullURL   string
@@ -8,7 +8,7 @@ type URLEntry struct {
 	IsDeleted bool
 }
 
-// UserURL — short_path + original_url, используется в GetByUserID.
+// UserURL — пара short_path и original_url для выдачи по пользователю.
 type UserURL struct {
 	ShortPath   string
 	OriginalURL string

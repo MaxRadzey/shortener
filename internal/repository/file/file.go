@@ -19,11 +19,13 @@ type fileRecord struct {
 	IsDeleted bool   `json:"is_deleted"`
 }
 
+// FileRepository хранит URL в одном JSON-файле (одна строка — один JSON-объект).
 type FileRepository struct {
 	mu       sync.RWMutex
 	filePath string
 }
 
+// NewFileRepository создаёт репозиторий для работы с указанным файлом.
 func NewFileRepository(filePath string) (*FileRepository, error) {
 	if filePath == "" {
 		return nil, fmt.Errorf("file path cannot be empty")

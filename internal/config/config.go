@@ -5,23 +5,21 @@ import (
 	"os"
 )
 
+// Config — настройки приложения (адрес, БД, файл, логи, аудит, ключ подписи).
 type Config struct {
 	Address          string
 	ReturningAddress string
 	LogLevel         string
 	FilePath         string
 	DatabaseDSN      string
-	// SigningKey — секрет для HMAC-подписи куки (не шифрование). Кука = base64(userID).base64(hmac).
-	// В проде обязательно задавать через SECRET_KEY; дефолт — только для локальной разработки.
+	// SigningKey — секрет для подписи куки (в проде задавать через SECRET_KEY).
 	SigningKey string
-	// AuditFile — путь к файлу для логов аудита. Пусто = аудит в файл отключён.
-	AuditFile string
-	// AuditURL — URL удалённого сервера-приёмника для логов аудита. Пусто = аудит на удалённый сервер отключён.
-	AuditURL string
-	// DevMode — режим разработки.
-	DevMode bool
+	AuditFile  string // путь к файлу аудита; пусто — выключено
+	AuditURL   string // URL приёмника аудита; пусто — выключено
+	DevMode    bool   // режим разработки (pprof и т.п.)
 }
 
+// New возвращает конфиг с дефолтными значениями.
 func New() *Config {
 	return &Config{
 		Address:          "localhost:8080",
@@ -33,6 +31,7 @@ func New() *Config {
 	}
 }
 
+// ParseEnv подставляет в config значения из переменных окружения.
 func ParseEnv(config *Config) {
 	if Address := os.Getenv("SERVER_ADDRESS"); Address != "" {
 		config.Address = Address
@@ -63,8 +62,7 @@ func ParseEnv(config *Config) {
 	}
 }
 
-// ParseFlags парсит флаги командной строки и обновляет конфигурацию.
-// Флаги имеют приоритет над переменными окружения.
+// ParseFlags парсит флаги (-a, -b, -d, -f, -dev и др.); приоритет над env.
 func ParseFlags(config *Config) {
 	flag.StringVar(&config.Address, "a", config.Address, "address and port to run server")
 	flag.StringVar(&config.ReturningAddress, "b", config.ReturningAddress, "address to return URL")

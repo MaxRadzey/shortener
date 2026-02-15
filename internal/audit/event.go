@@ -2,12 +2,12 @@ package audit
 
 import "time"
 
-// Event — событие аудита запроса.
+// Event — одно событие аудита (время, действие shorten/follow, user_id, url).
 type Event struct {
-	TS     int64  `json:"ts"`      // unix timestamp события
-	Action string `json:"action"`  // "shorten" (создание) или "follow" (прохождение по ссылке)
-	UserID string `json:"user_id"` // идентификатор пользователя, если есть
-	URL    string `json:"url"`     // оригинальный (не сокращённый) URL
+	TS     int64  `json:"ts"`
+	Action string `json:"action"`
+	UserID string `json:"user_id"`
+	URL    string `json:"url"`
 }
 
 // NewEvent создаёт событие с текущим временем.

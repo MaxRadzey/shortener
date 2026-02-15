@@ -13,11 +13,13 @@ import (
 	"github.com/MaxRadzey/shortener/internal/utils"
 )
 
+// Service реализует бизнес-логику сокращения URL и работы с репозиторием.
 type Service struct {
 	repo      repository.URLRepository
 	appConfig config.Config
 }
 
+// NewService возвращает сервис с заданным репозиторием и конфигом.
 func NewService(repo repository.URLRepository, appConfig config.Config) *Service {
 	return &Service{
 		repo:      repo,
@@ -35,6 +37,7 @@ func (s *Service) buildShortURL(shortPath string) string {
 	return b.String()
 }
 
+// CreateShortURL создаёт короткий путь для longURL и сохраняет в репозитории; при дубликате возвращает ErrURLConflict.
 func (s *Service) CreateShortURL(longURL, userID string) (string, error) {
 	shortPath, err := utils.GetShortPath(longURL)
 	if err != nil {
@@ -55,6 +58,7 @@ func (s *Service) CreateShortURL(longURL, userID string) (string, error) {
 	return s.buildShortURL(shortPath), nil
 }
 
+// GetLongURL возвращает оригинальный URL по short_path; ErrNotFound / ErrGone при отсутствии или удалении.
 func (s *Service) GetLongURL(shortPath string) (string, error) {
 	longURL, err := s.repo.Get(shortPath)
 	if err != nil {
@@ -73,13 +77,12 @@ func (s *Service) GetLongURL(shortPath string) (string, error) {
 	return longURL, nil
 }
 
-// Ping проверяет соединение с репозиторием.
-// Возвращает ошибку, если репозиторий недоступен.
+// Ping проверяет доступность репозитория.
 func (s *Service) Ping(ctx context.Context) error {
 	return s.repo.Ping(ctx)
 }
 
-// CreateShortURLBatch создает короткие URL для множества URL в одном запросе.
+// CreateShortURLBatch создаёт короткие ссылки для списка URL, сохраняет пачкой.
 func (s *Service) CreateShortURLBatch(ctx context.Context, items []models.BatchRequestItem, userID string) ([]models.BatchResponseItem, error) {
 	entries := make([]models.URLEntry, 0, len(items))
 	responseItems := make([]models.BatchResponseItem, 0, len(items))
@@ -110,8 +113,7 @@ func (s *Service) CreateShortURLBatch(ctx context.Context, items []models.BatchR
 	return responseItems, nil
 }
 
-// GetUserURLs возвращает все сокращённые пользователем URL.
-// При отсутствии записей — пустой слайс; хендлер в таком случае отдаёт 204.
+// GetUserURLs возвращает список коротких ссылок пользователя.
 func (s *Service) GetUserURLs(ctx context.Context, userID string) ([]models.UserURLItem, error) {
 	rows, err := s.repo.GetByUserID(ctx, userID)
 	if err != nil {
@@ -134,10 +136,7 @@ const (
 	deleteWorkers = 3
 )
 
-// DeleteURLs удаляет сокращённые URL по списку идентификаторов для указанного пользователя.
-// Использует паттерн fanIn для эффективного batch update: несколько воркеров собирают
-// shortPaths в буферы, которые затем обрабатываются batch update операциями.
-// Вызывается асинхронно из хендлера, поэтому ошибки логируются, но не возвращаются пользователю.
+// DeleteURLs помечает URL пользователя как удалённые пачками (асинхронно вызывается из хендлера).
 func (s *Service) DeleteURLs(ctx context.Context, userID string, shortUrls []string) error {
 	// Создаем входной канал для shortPaths
 	inputChan := make(chan string, len(shortUrls))

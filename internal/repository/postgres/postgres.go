@@ -12,10 +12,12 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
+// PostgresRepository хранит URL в PostgreSQL.
 type PostgresRepository struct {
 	db *pgxpool.Pool
 }
 
+// NewPostgresRepository создаёт репозиторий по пулу соединений; проверяет Ping.
 func NewPostgresRepository(db *pgxpool.Pool) (*PostgresRepository, error) {
 	if db == nil {
 		return nil, errors.New("database connection is nil")

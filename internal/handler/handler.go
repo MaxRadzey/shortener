@@ -17,6 +17,7 @@ import (
 	"go.uber.org/zap"
 )
 
+// Handler обрабатывает HTTP-запросы к эндпоинтам коротких ссылок.
 type Handler struct {
 	Service *service.Service
 	Audit   *audit.Notifier
@@ -70,9 +71,7 @@ func (h *Handler) decodeJSONBody(c *gin.Context, target interface{}) bool {
 	return true
 }
 
-// CreateURL хэндлер, обрабатывает POST-запросы, принимает текстовый URL в теле запроса,
-// создает короткий путь и возвращает его в виде строки с полным URL.
-// Ожидается Content-Type: text/plain. user_id в контексте от auth.
+// CreateURL — POST /: принимает URL в теле (text/plain), возвращает короткую ссылку (201) или конфликт (409).
 func (h *Handler) CreateURL(c *gin.Context) {
 	userID, ok := h.userIDFromContext(c)
 	if !ok {
@@ -117,9 +116,7 @@ func (h *Handler) CreateURL(c *gin.Context) {
 	c.String(http.StatusCreated, result)
 }
 
-// GetURL хэндлер, обрабатывает GET-запросы, получает в качестве параметра маршрута сокращенное значение URL,
-// ищет в БД совпадение длинного пути и производит редирект на него (307).
-// Для удалённого URL возвращает 410 Gone, для отсутствующего — 404 Not Found.
+// GetURL — GET /:short_path: редирект на оригинальный URL (307), иначе 404 или 410 если удалён.
 func (h *Handler) GetURL(c *gin.Context) {
 	shortPath := c.Param("short_path")
 	longURL, err := h.Service.GetLongURL(shortPath)
@@ -141,6 +138,7 @@ func (h *Handler) GetURL(c *gin.Context) {
 	c.Redirect(http.StatusTemporaryRedirect, longURL)
 }
 
+// GetURLJSON — POST /api/shorten: тело JSON {"url":"..."}, в ответе {"result":"короткая ссылка"}.
 func (h *Handler) GetURLJSON(c *gin.Context) {
 	userID, ok := h.userIDFromContext(c)
 	if !ok {
@@ -182,8 +180,7 @@ func (h *Handler) GetURLJSON(c *gin.Context) {
 	h.sendJSONResponse(c, http.StatusCreated, resp)
 }
 
-// Ping хендлер проверяет соединение с базой данных.
-// Возвращает HTTP 200 OK при успешной проверке, 500 Internal Server Error при неуспешной.
+// Ping — GET /ping: проверка доступности хранилища, 200 или 500.
 func (h *Handler) Ping(c *gin.Context) {
 	ctx := c.Request.Context()
 	if err := h.Service.Ping(ctx); err != nil {
@@ -195,9 +192,7 @@ func (h *Handler) Ping(c *gin.Context) {
 	c.String(http.StatusOK, "OK")
 }
 
-// CreateURLBatch хендлер обрабатывает POST-запросы,
-// принимает массив объектов с correlation_id и original_url,
-// создает короткие URL для всех URL и возвращает массив объектов с correlation_id и short_url.
+// CreateURLBatch — POST /api/shorten/batch: массив {correlation_id, original_url}, ответ — массив {correlation_id, short_url}.
 func (h *Handler) CreateURLBatch(c *gin.Context) {
 	var reqItems []models.BatchRequestItem
 	if !h.decodeJSONBody(c, &reqItems) {
@@ -233,7 +228,7 @@ func (h *Handler) CreateURLBatch(c *gin.Context) {
 	h.sendJSONResponse(c, http.StatusCreated, responseItems)
 }
 
-// GetUserURLs возвращает все сокращённые пользователем URL.
+// GetUserURLs — GET /api/user/urls: список коротких ссылок пользователя (200) или 204 если пусто.
 func (h *Handler) GetUserURLs(c *gin.Context) {
 	userID, ok := h.requireUserID(c)
 	if !ok {
@@ -256,9 +251,7 @@ func (h *Handler) GetUserURLs(c *gin.Context) {
 	h.sendJSONResponse(c, http.StatusOK, items)
 }
 
-// DeleteURLs обрабатывает DELETE-запрос для асинхронного удаления сокращённых URL.
-// Принимает список идентификаторов сокращённых URL в теле запроса (JSON массив строк).
-// Возвращает HTTP 202 Accepted при успешном приёме запроса.
+// DeleteURLs — DELETE /api/user/urls: тело — JSON-массив short URL; удаление асинхронное, ответ 202.
 func (h *Handler) DeleteURLs(c *gin.Context) {
 	userID, ok := h.requireUserID(c)
 	if !ok {
