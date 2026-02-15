@@ -81,6 +81,25 @@ Shortener — это веб-сервис для сокращения длинн�
 - `LOG_LEVEL` — уровень логирования (по умолчанию: `info`)
 - `FILE_PATH` — путь к файлу для хранения данных, если не используется БД (по умолчанию: `/tmp/data.json`)
 
+### Режим разработки и pprof
+
+Эндпоинты профилирования **pprof** (`/debug/pprof/`) доступны **только в режиме разработки (DevMode)**. В проде маршруты pprof не регистрируются, обращаться к ним нельзя.
+
+Включить DevMode можно одним из способов:
+
+- **Переменная окружения:** `APP_ENV=dev` или `APP_ENV=development`
+- **Флаг:** `-dev` при запуске (например: `go run cmd/shortener/main.go -dev`)
+
+Пример запуска с pprof:
+
+```bash
+APP_ENV=dev go run cmd/shortener/main.go
+# или
+go run cmd/shortener/main.go -dev
+```
+
+Снимок heap-профиля: `curl -o profiles/heap.pprof "http://localhost:8080/debug/pprof/heap"`
+
 ### Примеры использования API
 
 **Создание короткой ссылки (текстовый формат):**

@@ -18,6 +18,8 @@ type Config struct {
 	AuditFile string
 	// AuditURL — URL удалённого сервера-приёмника для логов аудита. Пусто = аудит на удалённый сервер отключён.
 	AuditURL string
+	// DevMode — режим разработки.
+	DevMode bool
 }
 
 func New() *Config {
@@ -56,6 +58,9 @@ func ParseEnv(config *Config) {
 	if v := os.Getenv("AUDIT_URL"); v != "" {
 		config.AuditURL = v
 	}
+	if v := os.Getenv("APP_ENV"); v == "dev" || v == "development" {
+		config.DevMode = true
+	}
 }
 
 // ParseFlags парсит флаги командной строки и обновляет конфигурацию.
@@ -68,6 +73,7 @@ func ParseFlags(config *Config) {
 	flag.StringVar(&config.DatabaseDSN, "d", config.DatabaseDSN, "database connection string")
 	flag.StringVar(&config.AuditFile, "audit-file", config.AuditFile, "path to audit log file (empty = disabled)")
 	flag.StringVar(&config.AuditURL, "audit-url", config.AuditURL, "URL of remote audit receiver (empty = disabled)")
+	flag.BoolVar(&config.DevMode, "dev", config.DevMode, "enable dev mode")
 
 	flag.Parse()
 }

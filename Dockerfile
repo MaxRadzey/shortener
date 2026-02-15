@@ -1,4 +1,4 @@
-FROM golang:1.24-alpine AS builder
+FROM golang:1.25-alpine AS builder
 
 WORKDIR /app
 
@@ -16,7 +16,8 @@ RUN apk --no-cache add ca-certificates
 WORKDIR /root/
 
 COPY --from=builder /app/shortener .
+COPY --from=builder /app/migrations ./migrations
 
 EXPOSE 8080
 
-CMD ["./shortener"]
+CMD ["./shortener", "-dev"]
