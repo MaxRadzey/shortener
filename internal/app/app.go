@@ -1,6 +1,8 @@
 package app
 
 import (
+	_ "github.com/MaxRadzey/shortener/docs"
+
 	"github.com/MaxRadzey/shortener/internal/audit"
 	"github.com/MaxRadzey/shortener/internal/config"
 	httphandlers "github.com/MaxRadzey/shortener/internal/handler"

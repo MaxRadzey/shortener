@@ -1,0 +1,331 @@
+{
+    "swagger": "2.0",
+    "info": {
+        "description": "API для сокращения URL и управления короткими ссылками.",
+        "title": "Shortener API",
+        "contact": {},
+        "version": "1.0"
+    },
+    "host": "localhost:8080",
+    "basePath": "/",
+    "paths": {
+        "/": {
+            "post": {
+                "consumes": [
+                    "text/plain"
+                ],
+                "produces": [
+                    "text/plain"
+                ],
+                "tags": [
+                    "url"
+                ],
+                "summary": "Создать короткую ссылку (text/plain)",
+                "parameters": [
+                    {
+                        "description": "URL в теле",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "короткая ссылка",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "400": {
+                        "description": "невалидное тело",
+                        "schema": {
+                            "$ref": "#/definitions/handler.errResp"
+                        }
+                    },
+                    "409": {
+                        "description": "URL уже сокращён, в теле — существующая короткая ссылка",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/shorten": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "url"
+                ],
+                "summary": "Создать короткую ссылку (JSON)",
+                "parameters": [
+                    {
+                        "description": "URL",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/models.Request"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "короткая ссылка",
+                        "schema": {
+                            "$ref": "#/definitions/models.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "невалидный запрос",
+                        "schema": {
+                            "$ref": "#/definitions/handler.errResp"
+                        }
+                    },
+                    "409": {
+                        "description": "URL уже сокращён",
+                        "schema": {
+                            "$ref": "#/definitions/models.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/shorten/batch": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "url"
+                ],
+                "summary": "Создать несколько коротких ссылок",
+                "parameters": [
+                    {
+                        "description": "массив URL с correlation_id",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/models.BatchRequestItem"
+                            }
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "массив short_url с теми же correlation_id",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/models.BatchResponseItem"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "невалидный запрос",
+                        "schema": {
+                            "$ref": "#/definitions/handler.errResp"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/user/urls": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "user"
+                ],
+                "summary": "Список ссылок пользователя",
+                "responses": {
+                    "200": {
+                        "description": "список short_url и original_url",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/models.UserURLItem"
+                            }
+                        }
+                    },
+                    "204": {
+                        "description": "нет ссылок"
+                    },
+                    "401": {
+                        "description": "не авторизован"
+                    }
+                }
+            },
+            "delete": {
+                "consumes": [
+                    "application/json"
+                ],
+                "tags": [
+                    "user"
+                ],
+                "summary": "Удалить ссылки пользователя (асинхронно)",
+                "parameters": [
+                    {
+                        "description": "массив коротких URL для удаления",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                ],
+                "responses": {
+                    "202": {
+                        "description": "запрос принят"
+                    },
+                    "400": {
+                        "description": "невалидное тело",
+                        "schema": {
+                            "$ref": "#/definitions/handler.errResp"
+                        }
+                    },
+                    "401": {
+                        "description": "не авторизован"
+                    }
+                }
+            }
+        },
+        "/ping": {
+            "get": {
+                "produces": [
+                    "text/plain"
+                ],
+                "tags": [
+                    "health"
+                ],
+                "summary": "Проверка доступности хранилища",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "500": {
+                        "description": "ошибка соединения",
+                        "schema": {
+                            "$ref": "#/definitions/handler.errResp"
+                        }
+                    }
+                }
+            }
+        },
+        "/{short_path}": {
+            "get": {
+                "tags": [
+                    "url"
+                ],
+                "summary": "Редирект по короткой ссылке",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "короткий идентификатор",
+                        "name": "short_path",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "307": {
+                        "description": "редирект на оригинальный URL"
+                    },
+                    "404": {
+                        "description": "не найдено",
+                        "schema": {
+                            "$ref": "#/definitions/handler.errResp"
+                        }
+                    },
+                    "410": {
+                        "description": "ссылка удалена",
+                        "schema": {
+                            "$ref": "#/definitions/handler.errResp"
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "definitions": {
+        "handler.errResp": {
+            "type": "object",
+            "properties": {
+                "error": {
+                    "type": "string"
+                }
+            }
+        },
+        "models.BatchRequestItem": {
+            "type": "object",
+            "properties": {
+                "correlation_id": {
+                    "type": "string"
+                },
+                "original_url": {
+                    "type": "string"
+                }
+            }
+        },
+        "models.BatchResponseItem": {
+            "type": "object",
+            "properties": {
+                "correlation_id": {
+                    "type": "string"
+                },
+                "short_url": {
+                    "type": "string"
+                }
+            }
+        },
+        "models.Request": {
+            "type": "object",
+            "properties": {
+                "url": {
+                    "type": "string"
+                }
+            }
+        },
+        "models.Response": {
+            "type": "object",
+            "properties": {
+                "result": {
+                    "type": "string"
+                }
+            }
+        },
+        "models.UserURLItem": {
+            "type": "object",
+            "properties": {
+                "original_url": {
+                    "type": "string"
+                },
+                "short_url": {
+                    "type": "string"
+                }
+            }
+        }
+    }
+}

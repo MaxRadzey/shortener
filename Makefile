@@ -1,3 +1,7 @@
+# Генерация Swagger-доки
+swag:
+	go run github.com/swaggo/swag/cmd/swag@latest init -g cmd/shortener/main.go -d . --parseInternal -o docs
+
 # Форматирование кода + сортировка импортов
 fmt:
 	go run golang.org/x/tools/cmd/goimports@latest -w .

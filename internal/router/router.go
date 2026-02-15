@@ -8,6 +8,7 @@ import (
 	"github.com/MaxRadzey/shortener/internal/logger"
 	"github.com/MaxRadzey/shortener/internal/middleware"
 	"github.com/gin-gonic/gin"
+	"github.com/swaggo/swag"
 )
 
 // SetupRouter создаёт роутер с логгером, gzip, auth и маршрутами коротких ссылок.
@@ -29,6 +30,13 @@ func SetupRouter(h *handler.Handler, cfg *config.Config) *gin.Engine {
 	r.GET("/ping", h.Ping)
 	r.GET("/api/user/urls", h.GetUserURLs)
 	r.DELETE("/api/user/urls", h.DeleteURLs)
+
+	if cfg.DevMode {
+		r.GET("/swagger/doc.json", func(c *gin.Context) {
+			doc, _ := swag.ReadDoc("swagger")
+			c.Data(http.StatusOK, "application/json", []byte(doc))
+		})
+	}
 
 	return r
 }
