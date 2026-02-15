@@ -65,4 +65,3 @@ func HTTPLogger() gin.HandlerFunc {
 		)
 	}
 }
-

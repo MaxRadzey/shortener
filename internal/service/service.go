@@ -127,7 +127,6 @@ func (s *Service) GetUserURLs(ctx context.Context, userID string) ([]models.User
 	return out, nil
 }
 
-
 const (
 	// deleteBatchSize размер буфера для batch update при удалении URL
 	deleteBatchSize = 100

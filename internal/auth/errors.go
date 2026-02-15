@@ -6,9 +6,9 @@ import (
 )
 
 var (
-	ErrEmptyCookieValue = errors.New("empty cookie value")
+	ErrEmptyCookieValue    = errors.New("empty cookie value")
 	ErrInvalidCookieFormat = errors.New("invalid cookie format")
-	ErrInvalidSignature = errors.New("invalid signature")
+	ErrInvalidSignature    = errors.New("invalid signature")
 )
 
 // ErrInvalidUserID представляет ошибку невалидного user ID
@@ -24,4 +24,3 @@ func (e *ErrInvalidUserID) Error() string {
 func (e *ErrInvalidUserID) Unwrap() error {
 	return e.Err
 }
-

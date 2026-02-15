@@ -49,7 +49,6 @@ func Auth(secretKey string) gin.HandlerFunc {
 	}
 }
 
-
 // generateUserID создает новый UUID для пользователя
 func generateUserID() string {
 	return uuid.New().String()
