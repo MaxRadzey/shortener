@@ -17,3 +17,7 @@ load-post:
 # Нагрузка GET (wrk): из profiles/short_paths.txt
 load-get:
 	wrk -t4 -c100 -d1m -s profiles/load_get.lua http://localhost:8080/
+
+# Нагрузка GET /api/user/urls с кукой из profiles/cookies.txt (сначала make gen-cookies и load-post)
+load-get-user:
+	wrk -t4 -c100 -d30s -s profiles/load_get_user.lua http://localhost:8080/
