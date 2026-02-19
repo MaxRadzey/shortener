@@ -1,3 +1,4 @@
+// Package httpclient предоставляет HTTP-клиент с автоматическими ретраями при ошибках и 5xx.
 package httpclient
 
 import (
@@ -10,21 +11,23 @@ import (
 	"go.uber.org/zap"
 )
 
+// Параметры ретраев для RetryableClient.
 const (
-	MaxRetries        = 3
-	InitialRetryDelay = 1 * time.Second
+	MaxRetries        = 3               // максимальное число попыток (включая первую)
+	InitialRetryDelay = 1 * time.Second // базовая задержка перед повтором; далее exponential backoff
 )
 
-// RetryableClient оборачивает http.Client и добавляет автоматические ретраи.
+// RetryableClient оборачивает http.Client и повторяет запрос при сетевой ошибке или ответе 5xx.
 type RetryableClient struct {
 	client *http.Client
 }
 
-// NewRetryableClient создаёт клиент с поддержкой ретраев.
+// NewRetryableClient создаёт клиент с поддержкой ретраев; передаётся уже настроенный *http.Client.
 func NewRetryableClient(client *http.Client) *RetryableClient {
 	return &RetryableClient{client: client}
 }
 
+// shouldRetry возвращает true, если запрос стоит повторить (ошибка или статус 5xx).
 func shouldRetry(err error, statusCode int) bool {
 	if err != nil {
 		return true
@@ -32,7 +35,8 @@ func shouldRetry(err error, statusCode int) bool {
 	return statusCode >= 500 && statusCode < 600
 }
 
-// Do выполняет HTTP-запрос с автоматическими ретраями.
+// Do выполняет запрос через обёрнутый http.Client; при ошибке или 5xx повторяет до MaxRetries раз с exponential backoff.
+// Тело запроса при ретраях переиспользуется (читается в память до цикла).
 func (c *RetryableClient) Do(req *http.Request) (*http.Response, error) {
 	var body []byte
 	if req.Body != nil {
