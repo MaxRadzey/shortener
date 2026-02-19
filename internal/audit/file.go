@@ -11,19 +11,26 @@ import (
 
 // FileReceiver пишет события в файл по одной строке (append).
 type FileReceiver struct {
-	path string
+	file *os.File
 	mu   sync.Mutex
 }
 
 // NewFileReceiver возвращает приёмник для записи в указанный файл.
+// Файл открывается сразу и остаётся открытым на всё время жизни программы.
 func NewFileReceiver(path string) *FileReceiver {
-	return &FileReceiver{path: path}
+	file, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		logger.Log.Error("audit: failed to open audit file", zap.String("path", path), zap.Error(err))
+		return &FileReceiver{}
+	}
+	return &FileReceiver{file: file}
 }
 
 // Notify дописывает JSON события в конец файла.
 func (f *FileReceiver) Notify(event Event) {
-	f.mu.Lock()
-	defer f.mu.Unlock()
+	if f.file == nil {
+		return
+	}
 
 	data, err := json.Marshal(event)
 	if err != nil {
@@ -31,14 +38,11 @@ func (f *FileReceiver) Notify(event Event) {
 		return
 	}
 
-	file, err := os.OpenFile(f.path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-	if err != nil {
-		logger.Log.Error("audit: failed to open audit file", zap.String("path", f.path), zap.Error(err))
-		return
-	}
-	defer file.Close()
+	f.mu.Lock()
+	_, err = f.file.Write(append(data, '\n'))
+	f.mu.Unlock()
 
-	if _, err := file.Write(append(data, '\n')); err != nil {
+	if err != nil {
 		logger.Log.Error("audit: failed to write audit event", zap.Error(err))
 	}
 }

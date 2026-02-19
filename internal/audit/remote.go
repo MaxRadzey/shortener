@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/MaxRadzey/shortener/internal/httpclient"
 	"github.com/MaxRadzey/shortener/internal/logger"
 	"go.uber.org/zap"
 )
@@ -15,16 +16,16 @@ const remoteTimeout = 10 * time.Second
 // RemoteReceiver шлёт события на удалённый URL методом POST (асинхронно).
 type RemoteReceiver struct {
 	url    string
-	client *http.Client
+	client *httpclient.RetryableClient
 }
 
 // NewRemoteReceiver возвращает приёмник для указанного URL.
 func NewRemoteReceiver(url string) *RemoteReceiver {
 	return &RemoteReceiver{
 		url: url,
-		client: &http.Client{
+		client: httpclient.NewRetryableClient(&http.Client{
 			Timeout: remoteTimeout,
-		},
+		}),
 	}
 }
 
@@ -49,7 +50,7 @@ func (r *RemoteReceiver) Notify(event Event) {
 			logger.Log.Error("audit: failed to send event to remote", zap.String("url", r.url), zap.Error(err))
 			return
 		}
-		resp.Body.Close()
+		defer resp.Body.Close()
 		if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 			logger.Log.Warn("audit: remote returned non-success status", zap.Int("status", resp.StatusCode), zap.String("url", r.url))
 		}

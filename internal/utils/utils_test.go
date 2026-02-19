@@ -69,18 +69,16 @@ func TestIsValidURL(t *testing.T) {
 
 func BenchmarkGetShortPath(b *testing.B) {
 	url := "https://example.com/very/long/path/to/page"
-	b.ResetTimer()
 	b.ReportAllocs()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_, _ = GetShortPath(url)
 	}
 }
 
 func BenchmarkIsValidURL(b *testing.B) {
 	url := "https://example.com/page"
-	b.ResetTimer()
 	b.ReportAllocs()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_ = IsValidURL(url)
 	}
 }
