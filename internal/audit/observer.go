@@ -61,3 +61,23 @@ func (n *Notifier) Notify(event Event) {
 		o.Notify(event)
 	}
 }
+
+// Closer — интерфейс для наблюдателей, которые нужно закрыть при завершении (например, файл).
+type Closer interface {
+	Close() error
+}
+
+// Shutdown закрывает всех наблюдателей, реализующих Closer (например, FileReceiver).
+// Вызывать при штатном завершении, чтобы сбросить буферы и закрыть файлы.
+func (n *Notifier) Shutdown() {
+	n.mu.Lock()
+	snapshot := make([]Observer, len(n.observers))
+	copy(snapshot, n.observers)
+	n.mu.Unlock()
+
+	for _, o := range snapshot {
+		if c, ok := o.(Closer); ok {
+			_ = c.Close()
+		}
+	}
+}

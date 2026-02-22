@@ -60,5 +60,4 @@ func main() {
 		logger.Log.Error("failed to run app", zap.Error(err))
 		os.Exit(1)
 	}
-	logger.Log.Info("running server", zap.String("address", AppConfig.Address))
 }

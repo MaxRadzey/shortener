@@ -46,3 +46,19 @@ func (f *FileReceiver) Notify(event Event) {
 		logger.Log.Error("audit: failed to write audit event", zap.Error(err))
 	}
 }
+
+// Close синхронизирует и закрывает файл аудита (для штатного завершения).
+func (f *FileReceiver) Close() error {
+	f.mu.Lock()
+	file := f.file
+	f.file = nil
+	f.mu.Unlock()
+	if file == nil {
+		return nil
+	}
+	if err := file.Sync(); err != nil {
+		_ = file.Close()
+		return err
+	}
+	return file.Close()
+}
