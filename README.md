@@ -81,6 +81,27 @@ Shortener — это веб-сервис для сокращения длинн�
 - `LOG_LEVEL` — уровень логирования (по умолчанию: `info`)
 - `FILE_PATH` — путь к файлу для хранения данных, если не используется БД (по умолчанию: `/tmp/data.json`)
 
+### Режим разработки и pprof
+
+**Swagger-спека** (`GET /swagger/doc.json`) доступны **только в режиме разработки (DevMode)**. В проде эти маршруты не регистрируются.
+
+Для актуальной спеки после изменения хендлеров выполните: `make swag` (нужен установленный `swag`: `go install github.com/swaggo/swag/cmd/swag@latest`).
+
+Включить DevMode можно одним из способов:
+
+- **Переменная окружения:** `APP_ENV=dev` или `APP_ENV=development`
+- **Флаг:** `-dev` при запуске (например: `go run cmd/shortener/main.go -dev`)
+
+Пример запуска с pprof:
+
+```bash
+APP_ENV=dev go run cmd/shortener/main.go
+# или
+go run cmd/shortener/main.go -dev
+```
+
+Снимок heap-профиля: `curl -o profiles/heap.pprof "http://localhost:8080/debug/pprof/heap"`
+
 ### Примеры использования API
 
 **Создание короткой ссылки (текстовый формат):**
@@ -130,3 +151,76 @@ git fetch template && git checkout template/main .github
 При мёрже ветки с инкрементом в основную ветку `main` будут запускаться все автотесты.
 
 Подробнее про локальный и автоматический запуск читайте в [README автотестов](https://github.com/Yandex-Practicum/go-autotests).
+
+
+## Результат профилирования
+
+
+### Анализ оптимизации
+
+- **Буферы HTTP** — экономия ~1.5 MB на чтение и ~514 KB на запись. Оптимизации в обработчиках и middleware ускорили обработку запросов, поэтому в момент снятия профиля было меньше активных соединений и меньше буферов в памяти.
+
+- **Логирование** — экономия ~512 KB. Убрали лишние логи в горячих путях (там, где много запросов), уменьшили объём данных в логах.
+
+- **Получение URL по короткой ссылке** — экономия ~512 KB. Оптимизировали работу с результатами запросов к БД: теперь меньше копирований данных и меньше памяти удерживается после обработки запроса.
+
+- **Подключения к PostgreSQL** — экономия памяти на пул соединений и протокол обмена с БД.
+
+### Сравнение профилей (pprof -top -diff_base)
+
+```
+maksimradzej@MacBook-Pro-Maksim shortener % go tool pprof -top -diff_base=profiles/base.pprof profiles/result.pprof
+File: shortener
+Build ID: 8b05be819f1574281205d4aaab8cef8ca0a582bf
+Type: inuse_space
+Time: 2026-02-15 16:25:29 +05
+Showing nodes accounting for -3080.38kB, 42.77% of 7202.79kB total
+Dropped 2 nodes (cum <= 36.01kB)
+      flat  flat%   sum%        cum   cum%
+-1542.01kB 21.41% 21.41% -1542.01kB 21.41%  bufio.NewReaderSize (inline)
+    -514kB  7.14% 28.54%     -514kB  7.14%  bufio.NewWriterSize (inline)
+ -512.50kB  7.12% 35.66%  -512.50kB  7.12%  go.uber.org/zap/internal/bufferpool.init.NewPool.func1
+  512.14kB  7.11% 28.55%   512.14kB  7.11%  github.com/jackc/pgx/v5.(*Conn).getRows
+ -512.01kB  7.11% 35.66%  -512.01kB  7.11%  github.com/MaxRadzey/shortener/internal/repository/postgres.(*PostgresRepository).Get
+ -512.01kB  7.11% 42.77%  -512.01kB  7.11%  github.com/jackc/pgx/v5/pgproto3.(*AuthenticationSASL).Decode
+         0     0% 42.77% -1542.01kB 21.41%  bufio.NewReader (inline)
+         0     0% 42.77%  -512.01kB  7.11%  github.com/MaxRadzey/shortener/internal/handler.(*Handler).GetURL
+         0     0% 42.77%   512.14kB  7.11%  github.com/MaxRadzey/shortener/internal/handler.(*Handler).GetUserURLs
+         0     0% 42.77%   512.14kB  7.11%  github.com/MaxRadzey/shortener/internal/repository/postgres.(*PostgresRepository).GetByUserID
+         0     0% 42.77%  -512.37kB  7.11%  github.com/MaxRadzey/shortener/internal/router.SetupRouter.RequestLogger.func2
+         0     0% 42.77%  -512.37kB  7.11%  github.com/MaxRadzey/shortener/internal/router.SetupRouter.ResponseLogger.func3
+         0     0% 42.77%  -512.01kB  7.11%  github.com/MaxRadzey/shortener/internal/service.(*Service).GetLongURL
+         0     0% 42.77%   512.14kB  7.11%  github.com/MaxRadzey/shortener/internal/service.(*Service).GetUserURLs
+         0     0% 42.77%  -512.37kB  7.11%  github.com/gin-gonic/gin.(*Context).Next (partial-inline)
+         0     0% 42.77%  -512.37kB  7.11%  github.com/gin-gonic/gin.(*Engine).ServeHTTP
+         0     0% 42.77%  -512.37kB  7.11%  github.com/gin-gonic/gin.(*Engine).handleHTTPRequest
+         0     0% 42.77%  -512.37kB  7.11%  github.com/gin-gonic/gin.CustomRecoveryWithWriter.func1
+         0     0% 42.77%  -512.37kB  7.11%  github.com/gin-gonic/gin.LoggerWithConfig.func1
+         0     0% 42.77%   512.14kB  7.11%  github.com/jackc/pgx/v5.(*Conn).Query
+         0     0% 42.77%  -512.01kB  7.11%  github.com/jackc/pgx/v5.ConnectConfig
+         0     0% 42.77%  -512.01kB  7.11%  github.com/jackc/pgx/v5.connect
+         0     0% 42.77%  -512.01kB  7.11%  github.com/jackc/pgx/v5/pgconn.(*PgConn).peekMessage
+         0     0% 42.77%  -512.01kB  7.11%  github.com/jackc/pgx/v5/pgconn.(*PgConn).receiveMessage
+         0     0% 42.77%  -512.01kB  7.11%  github.com/jackc/pgx/v5/pgconn.ConnectConfig
+         0     0% 42.77%  -512.01kB  7.11%  github.com/jackc/pgx/v5/pgconn.connectOne
+         0     0% 42.77%  -512.01kB  7.11%  github.com/jackc/pgx/v5/pgconn.connectPreferred
+         0     0% 42.77%  -512.01kB  7.11%  github.com/jackc/pgx/v5/pgproto3.(*Frontend).Receive
+         0     0% 42.77%   512.14kB  7.11%  github.com/jackc/pgx/v5/pgxpool.(*Conn).Query
+         0     0% 42.77%   512.14kB  7.11%  github.com/jackc/pgx/v5/pgxpool.(*Pool).Query
+         0     0% 42.77%  -512.01kB  7.11%  github.com/jackc/pgx/v5/pgxpool.NewWithConfig.func3
+         0     0% 42.77%  -512.01kB  7.11%  github.com/jackc/puddle/v2.(*Pool[go.shape.*uint8]).initResourceValue.func1
+         0     0% 42.77%  -512.50kB  7.12%  go.uber.org/zap.(*Logger).Info
+         0     0% 42.77%  -512.50kB  7.12%  go.uber.org/zap/buffer.Pool.Get
+         0     0% 42.77%  -512.50kB  7.12%  go.uber.org/zap/internal/bufferpool.init.NewPool.New[go.shape.*uint8].func2
+         0     0% 42.77%  -512.50kB  7.12%  go.uber.org/zap/internal/pool.(*Pool[go.shape.*uint8]).Get (inline)
+         0     0% 42.77%  -512.50kB  7.12%  go.uber.org/zap/zapcore.(*CheckedEntry).Write
+         0     0% 42.77%  -512.50kB  7.12%  go.uber.org/zap/zapcore.(*ioCore).Write
+         0     0% 42.77%  -512.50kB  7.12%  go.uber.org/zap/zapcore.EntryCaller.TrimmedPath
+         0     0% 42.77%  -512.50kB  7.12%  go.uber.org/zap/zapcore.ShortCallerEncoder
+         0     0% 42.77%  -512.50kB  7.12%  go.uber.org/zap/zapcore.consoleEncoder.EncodeEntry
+         0     0% 42.77% -2568.38kB 35.66%  net/http.(*conn).serve
+         0     0% 42.77% -1542.01kB 21.41%  net/http.newBufioReader
+         0     0% 42.77%     -514kB  7.14%  net/http.newBufioWriterSize
+         0     0% 42.77%  -512.37kB  7.11%  net/http.serverHandler.ServeHTTP
+         0     0% 42.77%  -512.50kB  7.12%  sync.(*Pool).Get
+```

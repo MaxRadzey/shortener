@@ -14,24 +14,26 @@ import (
 	"go.uber.org/zap"
 )
 
-// RunMigrations запускает миграции базы данных из директории migrations.
-// Принимает DSN строку подключения и создает временное подключение через *sql.DB,
-// необходимое для golang-migrate (библиотека не поддерживает pgxpool напрямую).
-// Если миграции уже применены, функция возвращает nil.
-func RunMigrations(dsn string) error {
+// RunMigrations применяет SQL-миграции к БД (dsn); migrationsPath по умолчанию "migrations".
+func RunMigrations(dsn string, migrationsPath string) error {
 	if dsn == "" {
 		return nil
 	}
 
 	logger.Log.Info("Starting database migrations")
 
+	// Если путь к миграциям не указан, используем дефолтный
+	if migrationsPath == "" {
+		migrationsPath = "migrations"
+	}
+
 	// Получаем абсолютный путь к директории migrations
-	migrationsPath, err := filepath.Abs("migrations")
+	absMigrationsPath, err := filepath.Abs(migrationsPath)
 	if err != nil {
 		logger.Log.Error("Failed to get migrations path", zap.Error(err))
 		return fmt.Errorf("failed to get migrations path: %w", err)
 	}
-	logger.Log.Debug("Migrations path", zap.String("path", migrationsPath))
+	logger.Log.Debug("Migrations path", zap.String("path", absMigrationsPath))
 
 	db, err := sql.Open("pgx", dsn)
 	if err != nil {
@@ -49,7 +51,7 @@ func RunMigrations(dsn string) error {
 
 	// Создаем экземпляр мигратора
 	m, err := migrate.NewWithDatabaseInstance(
-		fmt.Sprintf("file://%s", migrationsPath),
+		fmt.Sprintf("file://%s", absMigrationsPath),
 		"postgres", instance)
 	if err != nil {
 		logger.Log.Error("Failed to create migrate instance", zap.Error(err))

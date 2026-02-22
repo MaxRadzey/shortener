@@ -1,0 +1,8 @@
+repos:
+  - repo: local
+    hooks:
+      - id: go-fmt-check
+        name: goimports check
+        entry: make fmt
+        language: system
+        pass_filenames: false

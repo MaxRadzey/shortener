@@ -1,20 +1,25 @@
-package storage
+// Package postgres реализует URLRepository для хранения данных в PostgreSQL.
+package postgres
 
 import (
 	"context"
 	"errors"
 	"fmt"
 
+	"github.com/MaxRadzey/shortener/internal/models"
+	"github.com/MaxRadzey/shortener/internal/repository"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-type PostgresStorage struct {
+// PostgresRepository хранит URL в PostgreSQL.
+type PostgresRepository struct {
 	db *pgxpool.Pool
 }
 
-func NewPostgresStorage(db *pgxpool.Pool) (*PostgresStorage, error) {
+// NewPostgresRepository создаёт репозиторий по пулу соединений; проверяет Ping.
+func NewPostgresRepository(db *pgxpool.Pool) (*PostgresRepository, error) {
 	if db == nil {
 		return nil, errors.New("database connection is nil")
 	}
@@ -25,12 +30,13 @@ func NewPostgresStorage(db *pgxpool.Pool) (*PostgresStorage, error) {
 		return nil, fmt.Errorf("failed to ping database: %w", err)
 	}
 
-	return &PostgresStorage{
+	return &PostgresRepository{
 		db: db,
 	}, nil
 }
 
-func (p *PostgresStorage) Get(short string) (string, error) {
+// Get возвращает оригинальный URL по short path; ErrNotFound или ErrGone при отсутствии или удалении.
+func (p *PostgresRepository) Get(short string) (string, error) {
 	ctx := context.Background()
 	var originalURL string
 	var isDeleted bool
@@ -38,19 +44,20 @@ func (p *PostgresStorage) Get(short string) (string, error) {
 	err := p.db.QueryRow(ctx, "SELECT original_url, COALESCE(is_deleted, false) FROM urls WHERE short_path = $1", short).Scan(&originalURL, &isDeleted)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return "", &ErrNotFound{ShortPath: short}
+			return "", &repository.ErrNotFound{ShortPath: short}
 		}
 		return "", fmt.Errorf("failed to get URL: %w", err)
 	}
 
 	if isDeleted {
-		return "", &ErrGone{ShortPath: short}
+		return "", &repository.ErrGone{ShortPath: short}
 	}
 
 	return originalURL, nil
 }
 
-func (p *PostgresStorage) Create(item URLEntry) error {
+// Create сохраняет запись в БД; при дубликате original_url возвращает ErrURLAlreadyExists.
+func (p *PostgresRepository) Create(item models.URLEntry) error {
 	ctx := context.Background()
 
 	_, err := p.db.Exec(ctx, "INSERT INTO urls (short_path, original_url, user_id) VALUES ($1, $2, $3)", item.ShortPath, item.FullURL, item.UserID)
@@ -62,7 +69,7 @@ func (p *PostgresStorage) Create(item URLEntry) error {
 			if queryErr != nil {
 				return fmt.Errorf("failed to get existing short_path: %w", queryErr)
 			}
-			return &ErrURLAlreadyExists{ShortPath: existingShortPath}
+			return &repository.ErrURLAlreadyExists{ShortPath: existingShortPath}
 		}
 		return fmt.Errorf("failed to create URL: %w", err)
 	}
@@ -70,7 +77,8 @@ func (p *PostgresStorage) Create(item URLEntry) error {
 	return nil
 }
 
-func (p *PostgresStorage) CreateBatch(ctx context.Context, items []URLEntry) error {
+// CreateBatch сохраняет пачку записей в одной транзакции.
+func (p *PostgresRepository) CreateBatch(ctx context.Context, items []models.URLEntry) error {
 	// Используем транзакцию для атомарности
 	tx, err := p.db.Begin(ctx)
 	if err != nil {
@@ -106,16 +114,19 @@ func (p *PostgresStorage) CreateBatch(ctx context.Context, items []URLEntry) err
 	return nil
 }
 
-func (p *PostgresStorage) GetByUserID(ctx context.Context, userID string) ([]UserURL, error) {
+const defaultUserURLsCap = 64
+
+// GetByUserID возвращает все записи пользователя из БД.
+func (p *PostgresRepository) GetByUserID(ctx context.Context, userID string) ([]models.UserURL, error) {
 	rows, err := p.db.Query(ctx, "SELECT short_path, original_url FROM urls WHERE user_id = $1", userID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get URLs by user: %w", err)
 	}
 	defer rows.Close()
 
-	var out []UserURL
+	out := make([]models.UserURL, 0, defaultUserURLsCap)
 	for rows.Next() {
-		var u UserURL
+		var u models.UserURL
 		if err := rows.Scan(&u.ShortPath, &u.OriginalURL); err != nil {
 			return nil, fmt.Errorf("failed to scan row: %w", err)
 		}
@@ -126,7 +137,7 @@ func (p *PostgresStorage) GetByUserID(ctx context.Context, userID string) ([]Use
 
 // DeleteBatch выполняет batch update для установки флага is_deleted = true
 // для указанных short_path, принадлежащих указанному user_id.
-func (p *PostgresStorage) DeleteBatch(ctx context.Context, userID string, shortPaths []string) error {
+func (p *PostgresRepository) DeleteBatch(ctx context.Context, userID string, shortPaths []string) error {
 	// Используем транзакцию для атомарности
 	tx, err := p.db.Begin(ctx)
 	if err != nil {
@@ -166,6 +177,7 @@ func (p *PostgresStorage) DeleteBatch(ctx context.Context, userID string, shortP
 	return nil
 }
 
-func (p *PostgresStorage) Ping(ctx context.Context) error {
+// Ping проверяет соединение с БД.
+func (p *PostgresRepository) Ping(ctx context.Context) error {
 	return p.db.Ping(ctx)
 }

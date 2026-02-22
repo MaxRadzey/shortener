@@ -1,0 +1,213 @@
+basePath: /
+definitions:
+  handler.errResp:
+    properties:
+      error:
+        type: string
+    type: object
+  models.BatchRequestItem:
+    properties:
+      correlation_id:
+        type: string
+      original_url:
+        type: string
+    type: object
+  models.BatchResponseItem:
+    properties:
+      correlation_id:
+        type: string
+      short_url:
+        type: string
+    type: object
+  models.Request:
+    properties:
+      url:
+        type: string
+    type: object
+  models.Response:
+    properties:
+      result:
+        type: string
+    type: object
+  models.UserURLItem:
+    properties:
+      original_url:
+        type: string
+      short_url:
+        type: string
+    type: object
+host: localhost:8080
+info:
+  contact: {}
+  description: API для сокращения URL и управления короткими ссылками.
+  title: Shortener API
+  version: "1.0"
+paths:
+  /:
+    post:
+      consumes:
+      - text/plain
+      parameters:
+      - description: URL в теле
+        in: body
+        name: body
+        required: true
+        schema:
+          type: string
+      produces:
+      - text/plain
+      responses:
+        "201":
+          description: короткая ссылка
+          schema:
+            type: string
+        "400":
+          description: невалидное тело
+          schema:
+            $ref: '#/definitions/handler.errResp'
+        "409":
+          description: URL уже сокращён, в теле — существующая короткая ссылка
+          schema:
+            type: string
+      summary: Создать короткую ссылку (text/plain)
+      tags:
+      - url
+  /{short_path}:
+    get:
+      parameters:
+      - description: короткий идентификатор
+        in: path
+        name: short_path
+        required: true
+        type: string
+      responses:
+        "307":
+          description: редирект на оригинальный URL
+        "404":
+          description: не найдено
+          schema:
+            $ref: '#/definitions/handler.errResp'
+        "410":
+          description: ссылка удалена
+          schema:
+            $ref: '#/definitions/handler.errResp'
+      summary: Редирект по короткой ссылке
+      tags:
+      - url
+  /api/shorten:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: URL
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/models.Request'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: короткая ссылка
+          schema:
+            $ref: '#/definitions/models.Response'
+        "400":
+          description: невалидный запрос
+          schema:
+            $ref: '#/definitions/handler.errResp'
+        "409":
+          description: URL уже сокращён
+          schema:
+            $ref: '#/definitions/models.Response'
+      summary: Создать короткую ссылку (JSON)
+      tags:
+      - url
+  /api/shorten/batch:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: массив URL с correlation_id
+        in: body
+        name: body
+        required: true
+        schema:
+          items:
+            $ref: '#/definitions/models.BatchRequestItem'
+          type: array
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: массив short_url с теми же correlation_id
+          schema:
+            items:
+              $ref: '#/definitions/models.BatchResponseItem'
+            type: array
+        "400":
+          description: невалидный запрос
+          schema:
+            $ref: '#/definitions/handler.errResp'
+      summary: Создать несколько коротких ссылок
+      tags:
+      - url
+  /api/user/urls:
+    delete:
+      consumes:
+      - application/json
+      parameters:
+      - description: массив коротких URL для удаления
+        in: body
+        name: body
+        required: true
+        schema:
+          items:
+            type: string
+          type: array
+      responses:
+        "202":
+          description: запрос принят
+        "400":
+          description: невалидное тело
+          schema:
+            $ref: '#/definitions/handler.errResp'
+        "401":
+          description: не авторизован
+      summary: Удалить ссылки пользователя (асинхронно)
+      tags:
+      - user
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: список short_url и original_url
+          schema:
+            items:
+              $ref: '#/definitions/models.UserURLItem'
+            type: array
+        "204":
+          description: нет ссылок
+        "401":
+          description: не авторизован
+      summary: Список ссылок пользователя
+      tags:
+      - user
+  /ping:
+    get:
+      produces:
+      - text/plain
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: string
+        "500":
+          description: ошибка соединения
+          schema:
+            $ref: '#/definitions/handler.errResp'
+      summary: Проверка доступности хранилища
+      tags:
+      - health
+swagger: "2.0"

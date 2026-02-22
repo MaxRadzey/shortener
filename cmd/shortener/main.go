@@ -1,3 +1,4 @@
+// Package main — точка входа: парсит конфиг и запускает HTTP-сервер коротких ссылок.
 package main
 
 import (
@@ -7,6 +8,11 @@ import (
 	"go.uber.org/zap"
 )
 
+// @title        Shortener API
+// @version      1.0
+// @description  API для сокращения URL и управления короткими ссылками.
+// @host         localhost:8080
+// @BasePath     /
 func main() {
 	AppConfig := config.New()
 

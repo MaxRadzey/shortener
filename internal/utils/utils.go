@@ -1,38 +1,50 @@
+// Package utils — хелперы: короткий хеш URL, валидация URL, маскировка DSN для логов.
 package utils
 
 import (
 	"crypto/sha1"
 	"encoding/base64"
 	"errors"
+	"hash"
 	"net/url"
 	"strings"
+	"sync"
 )
 
-// GetShortPath возвращает короткое уникальное строковое представление пути (URL),
-// который был передан. Использует алгоритм шифрования sha1 и кодирование base64.
-// Результат обрезается до 6 символов.
+var (
+	hasherPool = sync.Pool{
+		New: func() interface{} { return sha1.New() },
+	}
+	base64BufPool = sync.Pool{
+		New: func() interface{} { return make([]byte, base64.URLEncoding.EncodedLen(sha1.Size)) },
+	}
+)
+
+// GetShortPath по строке (URL) возвращает короткий идентификатор (sha1+base64, 6 символов).
 func GetShortPath(path string) (string, error) {
 	if strings.TrimSpace(path) == "" {
 		return "", errors.New("empty string cannot be shortened")
 	}
 
-	hasher := sha1.New()
-	hasher.Write([]byte(path))
-	hash := hasher.Sum(nil)
+	h := hasherPool.Get().(hash.Hash)
+	defer hasherPool.Put(h)
+	h.Reset()
+	h.Write([]byte(path))
+	hash := h.Sum(nil)
 
-	short := base64.URLEncoding.EncodeToString(hash)[:6]
-	return short, nil
+	buf := base64BufPool.Get().([]byte)
+	defer base64BufPool.Put(buf)
+	base64.URLEncoding.Encode(buf, hash)
+	return string(buf[:6]), nil
 }
 
-// IsValidURL валидирует переданную строку и возвращает булево значение True,
-// если строка - валидный URL, иначе False.
+// IsValidURL проверяет, что строка — валидный URL.
 func IsValidURL(urlToCheck string) bool {
 	_, err := url.ParseRequestURI(urlToCheck)
 	return err == nil
 }
 
-// MaskDSN скрывает пароль в DSN для безопасного логирования.
-// Простая маскировка - скрываем пароль после @
+// MaskDSN возвращает DSN с замаскированным паролем для логов.
 // postgres://user:password@host:port/db -> postgres://user:***@host:port/db
 func MaskDSN(dsn string) string {
 	if idx := strings.Index(dsn, "@"); idx > 0 {

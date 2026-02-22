@@ -7,8 +7,8 @@ import (
 
 	"github.com/MaxRadzey/shortener/internal/config"
 	httphandlers "github.com/MaxRadzey/shortener/internal/handler"
+	"github.com/MaxRadzey/shortener/internal/models"
 	"github.com/MaxRadzey/shortener/internal/service"
-	dbstorage "github.com/MaxRadzey/shortener/internal/storage"
 	teststorage "github.com/MaxRadzey/shortener/internal/testing"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
@@ -25,12 +25,12 @@ func TestAuth(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	userID := "550e8400-e29b-41d4-a716-446655440000"
-	storage := teststorage.NewFakeStorageWithEntries(map[string]dbstorage.URLEntry{
+	repo := teststorage.NewFakeRepositoryWithEntries(map[string]models.URLEntry{
 		"XxLlqM": {ShortPath: "XxLlqM", FullURL: "https://vk.com", UserID: userID},
 	})
 
 	// Создаем handler
-	urlService := service.NewService(storage, *cfg)
+	urlService := service.NewService(repo, *cfg)
 	handler := &httphandlers.Handler{Service: urlService}
 
 	tests := []struct {

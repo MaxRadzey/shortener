@@ -1,3 +1,4 @@
+// Package logger настраивает глобальный zap-логгер и HTTP-логирование запросов.
 package logger
 
 import (
@@ -7,31 +8,35 @@ import (
 	"go.uber.org/zap"
 )
 
+// Log — глобальный логгер; инициализируется через Initialize.
 var Log *zap.Logger = zap.NewNop()
 
-type (
-	responseData struct {
-		status int
-		size   int
-	}
+// responseData хранит статус и размер ответа для логгера.
+type responseData struct {
+	status int
+	size   int
+}
 
-	loggingResponseWriter struct {
-		gin.ResponseWriter
-		responseData *responseData
-	}
-)
+// loggingResponseWriter оборачивает ResponseWriter для подсчёта размера и статуса.
+type loggingResponseWriter struct {
+	gin.ResponseWriter
+	responseData *responseData
+}
 
+// Write записывает данные и учитывает размер в responseData.
 func (r *loggingResponseWriter) Write(b []byte) (int, error) {
 	size, err := r.ResponseWriter.Write(b)
 	r.responseData.size += size
 	return size, err
 }
 
+// WriteHeader сохраняет статус в responseData и вызывает WriteHeader ниже по цепочке.
 func (r *loggingResponseWriter) WriteHeader(statusCode int) {
 	r.ResponseWriter.WriteHeader(statusCode)
 	r.responseData.status = statusCode
 }
 
+// Initialize настраивает глобальный логгер по уровню (info, debug и т.д.).
 func Initialize(level string) error {
 	lvl, err := zap.ParseAtomicLevel(level)
 	if err != nil {
@@ -50,38 +55,19 @@ func Initialize(level string) error {
 	return nil
 }
 
-func RequestLogger() gin.HandlerFunc {
+// HTTPLogger — middleware, логирующий метод, путь, статус, размер и время запроса.
+func HTTPLogger() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		start := time.Now()
-
+		rd := &responseData{status: 0, size: 0}
+		c.Writer = &loggingResponseWriter{ResponseWriter: c.Writer, responseData: rd}
 		c.Next()
-
-		duration := time.Since(start)
-		Log.Info("got incoming HTTP request",
-			zap.String("URI", c.Request.RequestURI),
+		Log.Info("request",
 			zap.String("method", c.Request.Method),
-			zap.Duration("duration", duration),
-		)
-	}
-}
-
-func ResponseLogger() gin.HandlerFunc {
-	return func(c *gin.Context) {
-		responseData := &responseData{
-			status: 0,
-			size:   0,
-		}
-
-		lw := &loggingResponseWriter{
-			ResponseWriter: c.Writer,
-			responseData:   responseData,
-		}
-		c.Writer = lw
-		c.Next()
-
-		Log.Info("response",
-			zap.Int("status", lw.responseData.status),
-			zap.Int("size", lw.responseData.size),
+			zap.String("path", c.Request.URL.Path),
+			zap.Int("status", rd.status),
+			zap.Int("size", rd.size),
+			zap.Duration("duration", time.Since(start)),
 		)
 	}
 }

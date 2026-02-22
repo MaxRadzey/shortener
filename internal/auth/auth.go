@@ -1,11 +1,10 @@
+// Package auth предоставляет функции работы с кукой пользователя (создание, проверка подписи).
 package auth
 
 import (
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/hex"
-	"errors"
-	"fmt"
 	"net/http"
 	"strings"
 	"time"
@@ -13,6 +12,7 @@ import (
 	"github.com/google/uuid"
 )
 
+// CookieName — имя куки с идентификатором пользователя.
 const CookieName = "user_id"
 
 // GetOrCreateUser: если куки нет — создаёт пользователя, ставит куку, возвращает (userID, false).
@@ -54,7 +54,7 @@ func NewCookie(userID, secret string) *http.Cookie {
 }
 
 func generateUserID() string {
-	return uuid.New().String()
+	return uuid.NewString()
 }
 
 func signData(data, key string) string {
@@ -81,20 +81,20 @@ func setAuthCookie(w http.ResponseWriter, userID, secret string) {
 // Возвращает ошибку, если кука невалидна или отсутствует.
 func ValidateCookie(cookie *http.Cookie, secret string) (string, error) {
 	if cookie == nil || cookie.Value == "" {
-		return "", errors.New("empty cookie value")
+		return "", ErrEmptyCookieValue
 	}
 	parts := strings.SplitN(cookie.Value, ".", 2)
 	if len(parts) != 2 {
-		return "", errors.New("invalid cookie format")
+		return "", ErrInvalidCookieFormat
 	}
 	userID := parts[0]
 	signature := parts[1]
 	if _, err := uuid.Parse(userID); err != nil {
-		return "", fmt.Errorf("invalid user ID: %w", err)
+		return "", &ErrInvalidUserID{UserID: userID, Err: err}
 	}
 	expected := signData(userID, secret)
 	if !hmac.Equal([]byte(signature), []byte(expected)) {
-		return "", errors.New("invalid signature")
+		return "", ErrInvalidSignature
 	}
 	return userID, nil
 }

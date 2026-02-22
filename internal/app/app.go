@@ -1,28 +1,33 @@
+// Package app собирает логгер, хранилище, сервис, роутер и запускает HTTP-сервер.
 package app
 
 import (
+	_ "github.com/MaxRadzey/shortener/docs"
+
+	"github.com/MaxRadzey/shortener/internal/audit"
 	"github.com/MaxRadzey/shortener/internal/config"
 	httphandlers "github.com/MaxRadzey/shortener/internal/handler"
 	"github.com/MaxRadzey/shortener/internal/logger"
 	"github.com/MaxRadzey/shortener/internal/router"
 	"github.com/MaxRadzey/shortener/internal/service"
-	dbstorage "github.com/MaxRadzey/shortener/internal/storage"
+	"github.com/MaxRadzey/shortener/internal/storage"
 	"go.uber.org/zap"
 )
 
-// Run запускает http сервер.
+// Run инициализирует логгер, хранилище, сервис, хендлеры и запускает HTTP-сервер.
 func Run(AppConfig *config.Config) error {
 	if err := logger.Initialize(AppConfig.LogLevel); err != nil {
 		return err
 	}
 
-	storageResult, err := dbstorage.InitializeStorage(AppConfig.DatabaseDSN, AppConfig.FilePath)
+	storageResult, err := storage.InitializeStorage(AppConfig.DatabaseDSN, AppConfig.FilePath)
 	if err != nil {
 		return err
 	}
 
-	urlService := service.NewService(storageResult.Storage, *AppConfig)
-	h := &httphandlers.Handler{Service: urlService}
+	urlService := service.NewService(storageResult.Repository, *AppConfig)
+	auditNotifier := audit.NewNotifier(AppConfig.AuditFile, AppConfig.AuditURL)
+	h := &httphandlers.Handler{Service: urlService, Audit: auditNotifier}
 
 	r := router.SetupRouter(h, AppConfig)
 

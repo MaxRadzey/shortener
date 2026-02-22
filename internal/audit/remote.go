@@ -1,0 +1,58 @@
+package audit
+
+import (
+	"bytes"
+	"encoding/json"
+	"net/http"
+	"time"
+
+	"github.com/MaxRadzey/shortener/internal/httpclient"
+	"github.com/MaxRadzey/shortener/internal/logger"
+	"go.uber.org/zap"
+)
+
+const remoteTimeout = 10 * time.Second
+
+// RemoteReceiver шлёт события на удалённый URL методом POST (асинхронно).
+type RemoteReceiver struct {
+	url    string
+	client *httpclient.RetryableClient
+}
+
+// NewRemoteReceiver возвращает приёмник для указанного URL.
+func NewRemoteReceiver(url string) *RemoteReceiver {
+	return &RemoteReceiver{
+		url: url,
+		client: httpclient.NewRetryableClient(&http.Client{
+			Timeout: remoteTimeout,
+		}),
+	}
+}
+
+// Notify отправляет событие POST на URL в горутине.
+func (r *RemoteReceiver) Notify(event Event) {
+	go func() {
+		data, err := json.Marshal(event)
+		if err != nil {
+			logger.Log.Error("audit: failed to marshal event for remote", zap.Error(err))
+			return
+		}
+
+		req, err := http.NewRequest(http.MethodPost, r.url, bytes.NewReader(data))
+		if err != nil {
+			logger.Log.Error("audit: failed to create request", zap.Error(err))
+			return
+		}
+		req.Header.Set("Content-Type", "application/json")
+
+		resp, err := r.client.Do(req)
+		if err != nil {
+			logger.Log.Error("audit: failed to send event to remote", zap.String("url", r.url), zap.Error(err))
+			return
+		}
+		defer resp.Body.Close()
+		if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+			logger.Log.Warn("audit: remote returned non-success status", zap.Int("status", resp.StatusCode), zap.String("url", r.url))
+		}
+	}()
+}

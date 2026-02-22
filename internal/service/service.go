@@ -1,67 +1,91 @@
+// Package service реализует бизнес-логику сокращения ссылок и пакетного удаления.
 package service
 
 import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"sync"
 
 	"github.com/MaxRadzey/shortener/internal/config"
 	"github.com/MaxRadzey/shortener/internal/models"
-	dbstorage "github.com/MaxRadzey/shortener/internal/storage"
+	"github.com/MaxRadzey/shortener/internal/repository"
 	"github.com/MaxRadzey/shortener/internal/utils"
 )
 
+// Service реализует бизнес-логику сокращения URL и работы с репозиторием.
 type Service struct {
-	storage   dbstorage.URLStorage
+	repo      repository.URLRepository
 	appConfig config.Config
 }
 
-func NewService(storage dbstorage.URLStorage, appConfig config.Config) *Service {
+// NewService возвращает сервис с заданным репозиторием и конфигом.
+func NewService(repo repository.URLRepository, appConfig config.Config) *Service {
 	return &Service{
-		storage:   storage,
+		repo:      repo,
 		appConfig: appConfig,
 	}
 }
 
+// buildShortURL собирает полный short URL без fmt.Sprintf для меньших аллокаций.
+func (s *Service) buildShortURL(shortPath string) string {
+	var b strings.Builder
+	b.Grow(len(s.appConfig.ReturningAddress) + 1 + len(shortPath))
+	b.WriteString(s.appConfig.ReturningAddress)
+	b.WriteByte('/')
+	b.WriteString(shortPath)
+	return b.String()
+}
+
+// CreateShortURL создаёт короткий путь для longURL и сохраняет в репозитории; при дубликате возвращает ErrURLConflict.
 func (s *Service) CreateShortURL(longURL, userID string) (string, error) {
 	shortPath, err := utils.GetShortPath(longURL)
 	if err != nil {
 		return "", fmt.Errorf("failed to generate short path: %w", err)
 	}
 
-	item := dbstorage.URLEntry{ShortPath: shortPath, FullURL: longURL, UserID: userID}
-	err = s.storage.Create(item)
+	item := models.URLEntry{ShortPath: shortPath, FullURL: longURL, UserID: userID}
+	err = s.repo.Create(item)
 	if err != nil {
-		var urlExistsErr *dbstorage.ErrURLAlreadyExists
+		var urlExistsErr *repository.ErrURLAlreadyExists
 		if errors.As(err, &urlExistsErr) {
-			existingURL := fmt.Sprintf("%s/%s", s.appConfig.ReturningAddress, urlExistsErr.ShortPath)
+			existingURL := s.buildShortURL(urlExistsErr.ShortPath)
 			return existingURL, &ErrURLConflict{ShortURL: existingURL}
 		}
 		return "", fmt.Errorf("failed to save URL: %w", err)
 	}
 
-	return fmt.Sprintf("%s/%s", s.appConfig.ReturningAddress, shortPath), nil
+	return s.buildShortURL(shortPath), nil
 }
 
+// GetLongURL возвращает оригинальный URL по short_path; ErrNotFound / ErrGone при отсутствии или удалении.
 func (s *Service) GetLongURL(shortPath string) (string, error) {
-	longURL, err := s.storage.Get(shortPath)
+	longURL, err := s.repo.Get(shortPath)
 	if err != nil {
-		return "", err
+		// Преобразуем ошибки repository в ошибки service для изоляции слоёв
+		var notFoundErr *repository.ErrNotFound
+		var goneErr *repository.ErrGone
+		if errors.As(err, &notFoundErr) {
+			return "", &ErrNotFound{ShortPath: notFoundErr.ShortPath}
+		}
+		if errors.As(err, &goneErr) {
+			return "", &ErrGone{ShortPath: goneErr.ShortPath}
+		}
+		return "", fmt.Errorf("failed to get URL: %w", err)
 	}
 
 	return longURL, nil
 }
 
-// Ping проверяет соединение с хранилищем.
-// Возвращает ошибку, если хранилище недоступно.
+// Ping проверяет доступность репозитория.
 func (s *Service) Ping(ctx context.Context) error {
-	return s.storage.Ping(ctx)
+	return s.repo.Ping(ctx)
 }
 
-// CreateShortURLBatch создает короткие URL для множества URL в одном запросе.
+// CreateShortURLBatch создаёт короткие ссылки для списка URL, сохраняет пачкой.
 func (s *Service) CreateShortURLBatch(ctx context.Context, items []models.BatchRequestItem, userID string) ([]models.BatchResponseItem, error) {
-	entries := make([]dbstorage.URLEntry, 0, len(items))
+	entries := make([]models.URLEntry, 0, len(items))
 	responseItems := make([]models.BatchResponseItem, 0, len(items))
 
 	for _, item := range items {
@@ -70,20 +94,19 @@ func (s *Service) CreateShortURLBatch(ctx context.Context, items []models.BatchR
 			return nil, fmt.Errorf("failed to generate short path: %w", err)
 		}
 
-		entries = append(entries, dbstorage.URLEntry{
+		entries = append(entries, models.URLEntry{
 			ShortPath: shortPath,
 			FullURL:   item.OriginalURL,
 			UserID:    userID,
 		})
 
-		shortURL := fmt.Sprintf("%s/%s", s.appConfig.ReturningAddress, shortPath)
 		responseItems = append(responseItems, models.BatchResponseItem{
 			CorrelationID: item.CorrelationID,
-			ShortURL:      shortURL,
+			ShortURL:      s.buildShortURL(shortPath),
 		})
 	}
 
-	err := s.storage.CreateBatch(ctx, entries)
+	err := s.repo.CreateBatch(ctx, entries)
 	if err != nil {
 		return nil, fmt.Errorf("failed to save batch URLs: %w", err)
 	}
@@ -91,23 +114,21 @@ func (s *Service) CreateShortURLBatch(ctx context.Context, items []models.BatchR
 	return responseItems, nil
 }
 
-// GetUserURLs возвращает все сокращённые пользователем URL.
-// При отсутствии записей — пустой слайс; хендлер в таком случае отдаёт 204.
+// GetUserURLs возвращает список коротких ссылок пользователя.
 func (s *Service) GetUserURLs(ctx context.Context, userID string) ([]models.UserURLItem, error) {
-	rows, err := s.storage.GetByUserID(ctx, userID)
+	rows, err := s.repo.GetByUserID(ctx, userID)
 	if err != nil {
 		return nil, err
 	}
 	out := make([]models.UserURLItem, 0, len(rows))
 	for _, r := range rows {
 		out = append(out, models.UserURLItem{
-			ShortURL:    fmt.Sprintf("%s/%s", s.appConfig.ReturningAddress, r.ShortPath),
+			ShortURL:    s.buildShortURL(r.ShortPath),
 			OriginalURL: r.OriginalURL,
 		})
 	}
 	return out, nil
 }
-
 
 const (
 	// deleteBatchSize размер буфера для batch update при удалении URL
@@ -116,10 +137,7 @@ const (
 	deleteWorkers = 3
 )
 
-// DeleteURLs удаляет сокращённые URL по списку идентификаторов для указанного пользователя.
-// Использует паттерн fanIn для эффективного batch update: несколько воркеров собирают
-// shortPaths в буферы, которые затем обрабатываются batch update операциями.
-// Вызывается асинхронно из хендлера, поэтому ошибки логируются, но не возвращаются пользователю.
+// DeleteURLs помечает URL пользователя как удалённые пачками (асинхронно вызывается из хендлера).
 func (s *Service) DeleteURLs(ctx context.Context, userID string, shortUrls []string) error {
 	// Создаем входной канал для shortPaths
 	inputChan := make(chan string, len(shortUrls))
@@ -165,7 +183,7 @@ func (s *Service) DeleteURLs(ctx context.Context, userID string, shortUrls []str
 	// Обрабатываем буферы batch update операциями
 	var lastErr error
 	for buffer := range bufferChan {
-		if err := s.storage.DeleteBatch(ctx, userID, buffer); err != nil {
+		if err := s.repo.DeleteBatch(ctx, userID, buffer); err != nil {
 			lastErr = fmt.Errorf("failed to delete batch: %w", err)
 			// Продолжаем обработку остальных буферов
 		}

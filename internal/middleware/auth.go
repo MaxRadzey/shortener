@@ -1,3 +1,4 @@
+// Package middleware содержит Gin middleware: аутентификация по куке, gzip.
 package middleware
 
 import (
@@ -19,7 +20,7 @@ import (
 
 const cookieName = "user_id"
 
-// Auth — middleware для аутентификации пользователя.
+// Auth выставляет в контексте user_id из куки или создаёт нового пользователя и ставит куку.
 func Auth(secretKey string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var userID string
@@ -48,7 +49,6 @@ func Auth(secretKey string) gin.HandlerFunc {
 		c.Next()
 	}
 }
-
 
 // generateUserID создает новый UUID для пользователя
 func generateUserID() string {
