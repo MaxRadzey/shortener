@@ -1,3 +1,4 @@
+// Тестовый main-пакет с panic в main() — ожидается диагностика про panic.
 package main
 
 func main() {
