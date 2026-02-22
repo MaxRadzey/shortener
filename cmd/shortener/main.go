@@ -2,6 +2,8 @@
 package main
 
 import (
+	"os"
+
 	"github.com/MaxRadzey/shortener/internal/app"
 	"github.com/MaxRadzey/shortener/internal/config"
 	"github.com/MaxRadzey/shortener/internal/logger"
@@ -20,7 +22,8 @@ func main() {
 	config.ParseFlags(AppConfig)
 
 	if err := app.Run(AppConfig); err != nil {
-		panic(err)
+		logger.Log.Error("failed to run app", zap.Error(err))
+		os.Exit(1)
 	}
 	logger.Log.Info("running server", zap.String("address", AppConfig.Address))
 }

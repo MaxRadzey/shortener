@@ -28,13 +28,15 @@ func main() {
 
 	request, err := http.NewRequest(http.MethodPost, endpoint, strings.NewReader(data.Encode()))
 	if err != nil {
-		panic(err)
+		fmt.Fprintf(os.Stderr, "Ошибка создания запроса: %v\n", err)
+		os.Exit(1)
 	}
 	request.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 
 	response, err := client.Do(request)
 	if err != nil {
-		panic(err)
+		fmt.Fprintf(os.Stderr, "Ошибка выполнения запроса: %v\n", err)
+		os.Exit(1)
 	}
 
 	fmt.Printf("Статус-код: %d\n", response.StatusCode)
