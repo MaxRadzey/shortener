@@ -1,7 +1,8 @@
-// Package config загружает настройки приложения из флагов и переменных окружения.
+// Package config загружает настройки приложения из файла JSON, флагов и переменных окружения.
 package config
 
 import (
+	"encoding/json"
 	"flag"
 	"os"
 )
@@ -22,6 +23,90 @@ type Config struct {
 	EnableHTTPS bool
 	TLSCertFile string // путь к сертификату (для ListenAndServeTLS)
 	TLSKeyFile  string // путь к приватному ключу (для ListenAndServeTLS)
+}
+
+// fileConfig — структура для парсинга JSON-файла конфигурации.
+// Используются указатели, чтобы различать «не задано» и «задано в пустое/ложь».
+type fileConfig struct {
+	ServerAddress   *string `json:"server_address,omitempty"`
+	BaseURL         *string `json:"base_url,omitempty"`
+	FileStoragePath *string `json:"file_storage_path,omitempty"`
+	DatabaseDSN     *string `json:"database_dsn,omitempty"`
+	EnableHTTPS     *bool   `json:"enable_https,omitempty"`
+	LogLevel        *string `json:"log_level,omitempty"`
+	SecretKey       *string `json:"secret_key,omitempty"`
+	AuditFile       *string `json:"audit_file,omitempty"`
+	AuditURL        *string `json:"audit_url,omitempty"`
+	DevMode         *bool   `json:"dev_mode,omitempty"`
+	TLSCertFile     *string `json:"tls_cert_file,omitempty"`
+	TLSKeyFile      *string `json:"tls_key_file,omitempty"`
+}
+
+// GetConfigFilePath возвращает путь к файлу конфигурации: флаг -c/-config или переменная окружения CONFIG.
+// Флаг проверяется по os.Args до вызова flag.Parse().
+func GetConfigFilePath() string {
+	if p := os.Getenv("CONFIG"); p != "" {
+		return p
+	}
+	for i := 0; i < len(os.Args)-1; i++ {
+		if os.Args[i] == "-c" || os.Args[i] == "-config" {
+			return os.Args[i+1]
+		}
+	}
+	return ""
+}
+
+// ParseConfigFile загружает конфигурацию из JSON-файла. Значения из файла имеют меньший приоритет,
+// чем переменные окружения и флаги — файл следует загружать до ParseEnv и ParseFlags.
+func ParseConfigFile(config *Config, path string) error {
+	if path == "" {
+		return nil
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return err
+	}
+	var fc fileConfig
+	if err := json.Unmarshal(data, &fc); err != nil {
+		return err
+	}
+	if fc.ServerAddress != nil {
+		config.Address = *fc.ServerAddress
+	}
+	if fc.BaseURL != nil {
+		config.ReturningAddress = *fc.BaseURL
+	}
+	if fc.FileStoragePath != nil {
+		config.FilePath = *fc.FileStoragePath
+	}
+	if fc.DatabaseDSN != nil {
+		config.DatabaseDSN = *fc.DatabaseDSN
+	}
+	if fc.EnableHTTPS != nil {
+		config.EnableHTTPS = *fc.EnableHTTPS
+	}
+	if fc.LogLevel != nil {
+		config.LogLevel = *fc.LogLevel
+	}
+	if fc.SecretKey != nil {
+		config.SigningKey = *fc.SecretKey
+	}
+	if fc.AuditFile != nil {
+		config.AuditFile = *fc.AuditFile
+	}
+	if fc.AuditURL != nil {
+		config.AuditURL = *fc.AuditURL
+	}
+	if fc.DevMode != nil {
+		config.DevMode = *fc.DevMode
+	}
+	if fc.TLSCertFile != nil {
+		config.TLSCertFile = *fc.TLSCertFile
+	}
+	if fc.TLSKeyFile != nil {
+		config.TLSKeyFile = *fc.TLSKeyFile
+	}
+	return nil
 }
 
 // New возвращает конфиг с дефолтными значениями.
@@ -76,8 +161,11 @@ func ParseEnv(config *Config) {
 	}
 }
 
-// ParseFlags парсит флаги (-a, -b, -d, -f, -dev и др.); приоритет над env.
+// ParseFlags парсит флаги (-a, -b, -c, -d, -f, -dev и др.); приоритет над env.
 func ParseFlags(config *Config) {
+	var configFile string
+	flag.StringVar(&configFile, "c", "", "path to JSON config file")
+	flag.StringVar(&configFile, "config", "", "path to JSON config file")
 	flag.StringVar(&config.Address, "a", config.Address, "address and port to run server")
 	flag.StringVar(&config.ReturningAddress, "b", config.ReturningAddress, "address to return URL")
 	flag.StringVar(&config.LogLevel, "l", config.LogLevel, "log level")

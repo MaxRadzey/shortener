@@ -48,6 +48,11 @@ func main() {
 
 	AppConfig := config.New()
 
+	if path := config.GetConfigFilePath(); path != "" {
+		if err := config.ParseConfigFile(AppConfig, path); err != nil {
+			logger.Log.Fatal("failed to load config file", zap.String("path", path), zap.Error(err))
+		}
+	}
 	config.ParseEnv(AppConfig)
 	config.ParseFlags(AppConfig)
 
