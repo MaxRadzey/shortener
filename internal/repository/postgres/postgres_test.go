@@ -38,7 +38,7 @@ func TestMain(m *testing.M) {
 		os.Stderr.WriteString("failed to get migrations path: " + err.Error() + "\n")
 		os.Stderr.WriteString("Tests will be skipped\n")
 		migrationsOK = false
-		os.Exit(m.Run())
+		os.Exit(m.Run()) // linter:ignore
 		return
 	}
 
@@ -46,7 +46,7 @@ func TestMain(m *testing.M) {
 		os.Stderr.WriteString("migrations: " + err.Error() + "\n")
 		os.Stderr.WriteString("Tests will be skipped\n")
 		migrationsOK = false
-		os.Exit(m.Run())
+		os.Exit(m.Run()) // linter:ignore
 		return
 	}
 	migrationsOK = true
@@ -57,7 +57,7 @@ func TestMain(m *testing.M) {
 		os.Stderr.WriteString("open db: " + err.Error() + "\n")
 		os.Stderr.WriteString("Tests will be skipped\n")
 		dbAvailable = false
-		os.Exit(m.Run())
+		os.Exit(m.Run()) // linter:ignore
 		return
 	}
 	defer func() {
@@ -71,12 +71,12 @@ func TestMain(m *testing.M) {
 		os.Stderr.WriteString("ping db: " + err.Error() + "\n")
 		os.Stderr.WriteString("Tests will be skipped\n")
 		dbAvailable = false
-		os.Exit(m.Run())
+		os.Exit(m.Run()) // linter:ignore
 		return
 	}
 
 	dbAvailable = true
-	os.Exit(m.Run())
+	os.Exit(m.Run()) // linter:ignore
 }
 
 // skipIfDBUnavailable пропускает тест, если БД недоступна или миграции не выполнены.

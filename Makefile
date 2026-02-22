@@ -18,6 +18,10 @@ run:
 test:
 	go test ./... -v
 
+# Запуск статического анализатора (panic, log.Fatal/os.Exit вне main)
+lint:
+	go run ./cmd/linter/... ./...
+
 # Нагрузка POST (wrk): из profiles/urls.txt
 load-post:
 	wrk -t4 -c100 -d1m -s profiles/load_post.lua http://localhost:8080/
