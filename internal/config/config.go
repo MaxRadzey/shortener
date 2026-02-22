@@ -18,6 +18,10 @@ type Config struct {
 	AuditFile  string // путь к файлу аудита; пусто — выключено
 	AuditURL   string // URL приёмника аудита; пусто — выключено
 	DevMode    bool   // режим разработки (pprof и т.п.)
+	// HTTPS: при true сервер запускается через TLS (флаг -s или ENABLE_HTTPS).
+	EnableHTTPS bool
+	TLSCertFile string // путь к сертификату (для ListenAndServeTLS)
+	TLSKeyFile  string // путь к приватному ключу (для ListenAndServeTLS)
 }
 
 // New возвращает конфиг с дефолтными значениями.
@@ -61,6 +65,15 @@ func ParseEnv(config *Config) {
 	if v := os.Getenv("APP_ENV"); v == "dev" || v == "development" {
 		config.DevMode = true
 	}
+	if v := os.Getenv("ENABLE_HTTPS"); v == "1" || v == "true" || v == "yes" {
+		config.EnableHTTPS = true
+	}
+	if v := os.Getenv("TLS_CERT_FILE"); v != "" {
+		config.TLSCertFile = v
+	}
+	if v := os.Getenv("TLS_KEY_FILE"); v != "" {
+		config.TLSKeyFile = v
+	}
 }
 
 // ParseFlags парсит флаги (-a, -b, -d, -f, -dev и др.); приоритет над env.
@@ -73,6 +86,9 @@ func ParseFlags(config *Config) {
 	flag.StringVar(&config.AuditFile, "audit-file", config.AuditFile, "path to audit log file (empty = disabled)")
 	flag.StringVar(&config.AuditURL, "audit-url", config.AuditURL, "URL of remote audit receiver (empty = disabled)")
 	flag.BoolVar(&config.DevMode, "dev", config.DevMode, "enable dev mode")
+	flag.BoolVar(&config.EnableHTTPS, "s", config.EnableHTTPS, "enable HTTPS (use TLS)")
+	flag.StringVar(&config.TLSCertFile, "cert", config.TLSCertFile, "path to TLS certificate file")
+	flag.StringVar(&config.TLSKeyFile, "key", config.TLSKeyFile, "path to TLS private key file")
 
 	flag.Parse()
 }

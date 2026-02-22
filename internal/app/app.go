@@ -2,6 +2,9 @@
 package app
 
 import (
+	"errors"
+	"fmt"
+
 	_ "github.com/MaxRadzey/shortener/docs"
 
 	"github.com/MaxRadzey/shortener/internal/audit"
@@ -31,6 +34,16 @@ func Run(AppConfig *config.Config) error {
 
 	r := router.SetupRouter(h, AppConfig)
 
+	if AppConfig.EnableHTTPS {
+		if AppConfig.TLSCertFile == "" || AppConfig.TLSKeyFile == "" {
+			return errors.New("HTTPS enabled: -cert and -key (or TLS_CERT_FILE and TLS_KEY_FILE) are required")
+		}
+		logger.Log.Info("Starting HTTPS server", zap.String("address", AppConfig.Address))
+		return r.RunTLS(AppConfig.Address, AppConfig.TLSCertFile, AppConfig.TLSKeyFile)
+	}
 	logger.Log.Info("Starting HTTP server", zap.String("address", AppConfig.Address))
-	return r.Run(AppConfig.Address)
+	if err := r.Run(AppConfig.Address); err != nil {
+		return fmt.Errorf("run server: %w", err)
+	}
+	return nil
 }
