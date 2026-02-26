@@ -9,12 +9,12 @@ import (
 	"net/url"
 	"strings"
 	"sync"
+
+	"github.com/MaxRadzey/shortener/internal/pool"
 )
 
 var (
-	hasherPool = sync.Pool{
-		New: func() interface{} { return sha1.New() },
-	}
+	hasherPool    = pool.New(func() hash.Hash { return sha1.New() })
 	base64BufPool = sync.Pool{
 		New: func() interface{} { return make([]byte, base64.URLEncoding.EncodedLen(sha1.Size)) },
 	}
@@ -26,9 +26,8 @@ func GetShortPath(path string) (string, error) {
 		return "", errors.New("empty string cannot be shortened")
 	}
 
-	h := hasherPool.Get().(hash.Hash)
+	h := hasherPool.Get()
 	defer hasherPool.Put(h)
-	h.Reset()
 	h.Write([]byte(path))
 	hash := h.Sum(nil)
 
