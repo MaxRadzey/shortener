@@ -4,6 +4,7 @@ package config
 import (
 	"flag"
 	"os"
+	"strconv"
 )
 
 // Config — настройки приложения (адрес, БД, файл, логи, аудит, ключ подписи).
@@ -13,11 +14,12 @@ type Config struct {
 	LogLevel         string // уровень логов (info, debug и т.д.)
 	FilePath         string // путь к файлу хранилища, если не используется БД
 	DatabaseDSN      string // строка подключения к PostgreSQL; пусто — БД не используется
-	// SigningKey — секрет для подписи куки (в проде задавать через SECRET_KEY).
-	SigningKey string
-	AuditFile  string // путь к файлу аудита; пусто — выключено
-	AuditURL   string // URL приёмника аудита; пусто — выключено
-	DevMode    bool   // режим разработки (pprof и т.п.)
+
+	SigningKey  string // SigningKey — секрет для подписи куки (в проде задавать через SECRET_KEY)
+	AuditFile   string // путь к файлу аудита; пусто — выключено
+	AuditURL    string // URL приёмника аудита; пусто — выключено
+	DevMode     bool   // режим разработки (pprof и т.п.)
+	EnableHTTPS bool   // включает запуск сервера по HTTPS (TLS)
 }
 
 // New возвращает конфиг с дефолтными значениями.
@@ -61,6 +63,11 @@ func ParseEnv(config *Config) {
 	if v := os.Getenv("APP_ENV"); v == "dev" || v == "development" {
 		config.DevMode = true
 	}
+	if v := os.Getenv("ENABLE_HTTPS"); v != "" {
+		if b, err := strconv.ParseBool(v); err == nil && b {
+			config.EnableHTTPS = true
+		}
+	}
 }
 
 // ParseFlags парсит флаги (-a, -b, -d, -f, -dev и др.); приоритет над env.
@@ -73,6 +80,7 @@ func ParseFlags(config *Config) {
 	flag.StringVar(&config.AuditFile, "audit-file", config.AuditFile, "path to audit log file (empty = disabled)")
 	flag.StringVar(&config.AuditURL, "audit-url", config.AuditURL, "URL of remote audit receiver (empty = disabled)")
 	flag.BoolVar(&config.DevMode, "dev", config.DevMode, "enable dev mode")
+	flag.BoolVar(&config.EnableHTTPS, "s", config.EnableHTTPS, "enable HTTPS (TLS) server mode")
 
 	flag.Parse()
 }

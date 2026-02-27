@@ -2,6 +2,8 @@
 package app
 
 import (
+	"net/http"
+
 	_ "github.com/MaxRadzey/shortener/docs"
 
 	"github.com/MaxRadzey/shortener/internal/audit"
@@ -32,5 +34,12 @@ func Run(AppConfig *config.Config) error {
 	r := router.SetupRouter(h, AppConfig)
 
 	logger.Log.Info("Starting HTTP server", zap.String("address", AppConfig.Address))
-	return r.Run(AppConfig.Address)
+
+	// Запускаем HTTP или HTTPS-сервер в зависимости от конфигурации.
+	if AppConfig.EnableHTTPS {
+		logger.Log.Info("HTTPS mode enabled")
+		return http.ListenAndServeTLS(AppConfig.Address, "server.crt", "server.key", r)
+	}
+
+	return http.ListenAndServe(AppConfig.Address, r)
 }
