@@ -92,3 +92,21 @@ func (m *MemoryRepository) Ping(ctx context.Context) error {
 	// In-memory хранилище всегда доступно
 	return nil
 }
+
+// CountURLs возвращает количество записей в хранилище.
+func (m *MemoryRepository) CountURLs(ctx context.Context) (int, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return len(m.data), nil
+}
+
+// CountUsers возвращает количество уникальных user_id в хранилище.
+func (m *MemoryRepository) CountUsers(ctx context.Context) (int, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	users := make(map[string]struct{})
+	for _, r := range m.data {
+		users[r.UserID] = struct{}{}
+	}
+	return len(users), nil
+}
