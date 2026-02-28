@@ -20,8 +20,9 @@ import (
 
 // Handler обрабатывает HTTP-запросы к эндпоинтам коротких ссылок.
 type Handler struct {
-	Service *service.Service
-	Audit   *audit.Notifier
+	Service       *service.Service
+	Audit         *audit.Notifier
+	TrustedSubnet string
 }
 
 type errResp struct {
@@ -339,4 +340,25 @@ func (h *Handler) DeleteURLs(c *gin.Context) {
 	}()
 
 	c.Status(http.StatusAccepted)
+}
+
+// GetInternalStats — GET /api/internal/stats: возвращает количество URL и пользователей.
+// Доступ разрешён только с IP из доверенной подсети (X-Real-IP). При пустом TrustedSubnet — 403.
+func (h *Handler) GetInternalStats(c *gin.Context) {
+	clientIP := c.GetHeader("X-Real-IP")
+
+	if !utils.IsIPInTrustedSubnet(clientIP, h.TrustedSubnet) {
+		c.AbortWithStatus(http.StatusForbidden)
+		return
+	}
+
+	ctx := c.Request.Context()
+	urls, users, err := h.Service.Stats(ctx)
+	if err != nil {
+		logger.Log.Error("Failed to get stats", zap.Error(err))
+		h.sendErrorJSON(c, http.StatusInternalServerError, "Internal server error")
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"urls": urls, "users": users})
 }

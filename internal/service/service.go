@@ -83,6 +83,29 @@ func (s *Service) Ping(ctx context.Context) error {
 	return s.repo.Ping(ctx)
 }
 
+// Stats возвращает количество URL и уникальных пользователей в хранилище.
+func (s *Service) Stats(ctx context.Context) (urls int, users int, err error) {
+	var wg sync.WaitGroup
+	wg.Add(2)
+	var errURLs, errUsers error
+	go func() {
+		defer wg.Done()
+		urls, errURLs = s.repo.CountURLs(ctx)
+	}()
+	go func() {
+		defer wg.Done()
+		users, errUsers = s.repo.CountUsers(ctx)
+	}()
+	wg.Wait()
+	if errURLs != nil {
+		return 0, 0, fmt.Errorf("count URLs: %w", errURLs)
+	}
+	if errUsers != nil {
+		return 0, 0, fmt.Errorf("count users: %w", errUsers)
+	}
+	return urls, users, nil
+}
+
 // CreateShortURLBatch создаёт короткие ссылки для списка URL, сохраняет пачкой.
 func (s *Service) CreateShortURLBatch(ctx context.Context, items []models.BatchRequestItem, userID string) ([]models.BatchResponseItem, error) {
 	entries := make([]models.URLEntry, 0, len(items))

@@ -29,6 +29,7 @@ func SetupRouter(h *handler.Handler, cfg *config.Config) *gin.Engine {
 	r.POST("/api/shorten", h.GetURLJSON)
 	r.POST("/api/shorten/batch", h.CreateURLBatch)
 	r.GET("/ping", h.Ping)
+	r.GET("/api/internal/stats", h.GetInternalStats)
 	r.GET("/api/user/urls", h.GetUserURLs)
 	r.DELETE("/api/user/urls", h.DeleteURLs)
 

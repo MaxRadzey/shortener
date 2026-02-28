@@ -43,7 +43,7 @@ func New(cfg *config.Config) (*App, error) {
 
 	urlService := service.NewService(storageResult.Repository, *cfg)
 	auditNotifier := audit.NewNotifier(cfg.AuditFile, cfg.AuditURL)
-	h := &httphandlers.Handler{Service: urlService, Audit: auditNotifier}
+	h := &httphandlers.Handler{Service: urlService, Audit: auditNotifier, TrustedSubnet: cfg.TrustedSubnet}
 	r := router.SetupRouter(h, cfg)
 
 	server := &http.Server{
