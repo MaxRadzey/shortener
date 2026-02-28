@@ -47,6 +47,7 @@ func main() {
 
 	AppConfig := config.New()
 
+	config.ParseFile(AppConfig)
 	config.ParseEnv(AppConfig)
 	config.ParseFlags(AppConfig)
 
