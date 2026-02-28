@@ -548,3 +548,70 @@ func TestDeleteURLs(t *testing.T) {
 		})
 	}
 }
+
+func TestHandler_GetInternalStats(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	trustedSubnet := "127.0.0.0/8"
+	cfg := *testConfig
+	cfg.TrustedSubnet = trustedSubnet
+
+	t.Run("with no data", func(t *testing.T) {
+		repo := teststorage.NewFakeRepository()
+		urlService := service.NewService(repo, cfg)
+		h := &handler.Handler{Service: urlService, TrustedSubnet: trustedSubnet}
+		rt := router.SetupRouter(h, &cfg)
+
+		req := httptest.NewRequest(http.MethodGet, "/api/internal/stats", nil)
+		req.Header.Set("X-Real-IP", "127.0.0.1")
+		rec := httptest.NewRecorder()
+		rt.ServeHTTP(rec, req)
+
+		require.Equal(t, http.StatusOK, rec.Code)
+		var body struct {
+			URLs  int `json:"urls"`
+			Users int `json:"users"`
+		}
+		require.NoError(t, json.NewDecoder(rec.Body).Decode(&body))
+		assert.Equal(t, 0, body.URLs)
+		assert.Equal(t, 0, body.Users)
+	})
+
+	t.Run("with data returns urls and users count", func(t *testing.T) {
+		repo := teststorage.NewFakeRepositoryWithEntries(map[string]models.URLEntry{
+			"a1": {ShortPath: "a1", FullURL: "https://a.com", UserID: "user1"},
+			"b2": {ShortPath: "b2", FullURL: "https://b.com", UserID: "user1"},
+			"c3": {ShortPath: "c3", FullURL: "https://c.com", UserID: "user2"},
+		})
+		urlService := service.NewService(repo, cfg)
+		h := &handler.Handler{Service: urlService, TrustedSubnet: trustedSubnet}
+		rt := router.SetupRouter(h, &cfg)
+
+		req := httptest.NewRequest(http.MethodGet, "/api/internal/stats", nil)
+		req.Header.Set("X-Real-IP", "127.0.0.1")
+		rec := httptest.NewRecorder()
+		rt.ServeHTTP(rec, req)
+
+		require.Equal(t, http.StatusOK, rec.Code)
+		var body struct {
+			URLs  int `json:"urls"`
+			Users int `json:"users"`
+		}
+		require.NoError(t, json.NewDecoder(rec.Body).Decode(&body))
+		assert.Equal(t, 3, body.URLs, "urls count")
+		assert.Equal(t, 2, body.Users, "users count")
+	})
+
+	t.Run("invalid IP returns 403", func(t *testing.T) {
+		repo := teststorage.NewFakeRepository()
+		urlService := service.NewService(repo, cfg)
+		h := &handler.Handler{Service: urlService, TrustedSubnet: trustedSubnet}
+		rt := router.SetupRouter(h, &cfg)
+
+		req := httptest.NewRequest(http.MethodGet, "/api/internal/stats", nil)
+		req.Header.Set("X-Real-IP", "192.168.1.1")
+		rec := httptest.NewRecorder()
+		rt.ServeHTTP(rec, req)
+
+		require.Equal(t, http.StatusForbidden, rec.Code)
+	})
+}
