@@ -51,9 +51,14 @@ func main() {
 	config.ParseEnv(AppConfig)
 	config.ParseFlags(AppConfig)
 
-	if err := app.Run(AppConfig); err != nil {
+	application, err := app.New(AppConfig)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "failed to init app: %v\n", err)
+		os.Exit(1)
+	}
+
+	if err := application.Run(); err != nil {
 		logger.Log.Error("failed to run app", zap.Error(err))
 		os.Exit(1)
 	}
-	logger.Log.Info("running server", zap.String("address", AppConfig.Address))
 }
