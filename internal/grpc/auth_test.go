@@ -24,7 +24,7 @@ func TestAuthUnaryInterceptor(t *testing.T) {
 		ctx := metadata.NewIncomingContext(context.Background(), metadata.Pairs("authorization", validToken))
 		info := &grpc.UnaryServerInfo{FullMethod: "/test/Method"}
 		handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-			v := ctx.Value(contextkeys.UserIDKey)
+			v := ctx.Value(contextkeys.UserIDContextKey)
 			require.NotNil(t, v)
 			assert.Equal(t, userID, v.(string))
 			return "ok", nil
@@ -38,7 +38,7 @@ func TestAuthUnaryInterceptor(t *testing.T) {
 		ctx := metadata.NewIncomingContext(context.Background(), metadata.Pairs("authorization", "invalid.token"))
 		info := &grpc.UnaryServerInfo{FullMethod: "/test/Method"}
 		handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-			v := ctx.Value(contextkeys.UserIDKey)
+			v := ctx.Value(contextkeys.UserIDContextKey)
 			assert.Nil(t, v)
 			return "ok", nil
 		}
@@ -51,7 +51,7 @@ func TestAuthUnaryInterceptor(t *testing.T) {
 		ctx := context.Background()
 		info := &grpc.UnaryServerInfo{FullMethod: "/test/Method"}
 		handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-			v := ctx.Value(contextkeys.UserIDKey)
+			v := ctx.Value(contextkeys.UserIDContextKey)
 			assert.Nil(t, v)
 			return "ok", nil
 		}

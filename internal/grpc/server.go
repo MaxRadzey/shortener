@@ -26,7 +26,7 @@ type Server struct {
 }
 
 func userIDFromContext(ctx context.Context) string {
-	v := ctx.Value(contextkeys.UserIDKey)
+	v := ctx.Value(contextkeys.UserIDContextKey)
 	if v == nil {
 		return ""
 	}

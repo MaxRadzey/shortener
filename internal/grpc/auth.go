@@ -27,7 +27,7 @@ func AuthUnaryInterceptor(signingKey string) grpc.UnaryServerInterceptor {
 			}
 		}
 		if userID != "" {
-			ctx = context.WithValue(ctx, contextkeys.UserIDKey, userID)
+			ctx = context.WithValue(ctx, contextkeys.UserIDContextKey, userID)
 		}
 		return handler(ctx, req)
 	}

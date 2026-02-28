@@ -31,7 +31,7 @@ func setupTestServer(t *testing.T, repo repository.URLRepository) *Server {
 }
 
 func ctxWithUser(userID string) context.Context {
-	return context.WithValue(context.Background(), contextkeys.UserIDKey, userID)
+	return context.WithValue(context.Background(), contextkeys.UserIDContextKey, userID)
 }
 
 func TestServer_ShortenURL(t *testing.T) {
