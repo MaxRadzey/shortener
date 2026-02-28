@@ -344,6 +344,15 @@ func (h *Handler) DeleteURLs(c *gin.Context) {
 
 // GetInternalStats — GET /api/internal/stats: возвращает количество URL и пользователей.
 // Доступ разрешён только с IP из доверенной подсети (X-Real-IP). При пустом TrustedSubnet — 403.
+//
+// @Summary  Статистика сервиса (внутренний API)
+// @Tags     internal
+// @Produce  json
+// @Param    X-Real-IP  header  string  false  "IP клиента (должен входить в доверенную подсеть)"
+// @Success  200  "количество url и пользователей"
+// @Failure  403  "доступ запрещён (IP не в доверенной подсети)"
+// @Failure  500  {object}  errResp  "внутренняя ошибка"
+// @Router   /api/internal/stats [get]
 func (h *Handler) GetInternalStats(c *gin.Context) {
 	clientIP := c.GetHeader("X-Real-IP")
 
