@@ -21,9 +21,6 @@ func AuthUnaryInterceptor(signingKey string) grpc.UnaryServerInterceptor {
 			vals := md.Get(metadataKeyAuthorization)
 			if len(vals) > 0 {
 				token := strings.TrimSpace(vals[0])
-				if strings.HasPrefix(strings.ToLower(token), "bearer ") {
-					token = strings.TrimSpace(token[7:])
-				}
 				if id, err := auth.ValidateAuthValue(token, signingKey); err == nil {
 					userID = id
 				}
