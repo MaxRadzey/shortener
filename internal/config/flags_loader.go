@@ -4,7 +4,8 @@ import "flag"
 
 // ParseFlags парсит флаги (-a, -b, -d, -f, -dev и др.); приоритет над env.
 func ParseFlags(config *Config) {
-	flag.StringVar(&config.Address, "a", config.Address, "address and port to run server")
+	flag.StringVar(&config.Address, "a", config.Address, "address and port to run HTTP server")
+	flag.StringVar(&config.GRPCAddress, "grpc-addr", config.GRPCAddress, "address and port to run gRPC server")
 	flag.StringVar(&config.ReturningAddress, "b", config.ReturningAddress, "address to return URL")
 	flag.StringVar(&config.LogLevel, "l", config.LogLevel, "log level")
 	flag.StringVar(&config.FilePath, "f", config.FilePath, "file path")

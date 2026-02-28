@@ -11,6 +11,7 @@ import (
 // fileConfig описывает поддерживаемые поля JSON-конфигурации.
 type fileConfig struct {
 	Address          *string `json:"server_address"`
+	GRPCAddress      *string `json:"grpc_server_address"`
 	ReturningAddress *string `json:"base_url"`
 	FilePath         *string `json:"file_storage_path"`
 	DatabaseDSN      *string `json:"database_dsn"`
@@ -46,6 +47,9 @@ func ParseFile(config *Config) {
 
 	if fc.Address != nil {
 		config.Address = *fc.Address
+	}
+	if fc.GRPCAddress != nil {
+		config.GRPCAddress = *fc.GRPCAddress
 	}
 	if fc.ReturningAddress != nil {
 		config.ReturningAddress = *fc.ReturningAddress

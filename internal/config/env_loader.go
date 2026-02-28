@@ -10,6 +10,9 @@ func ParseEnv(config *Config) {
 	if Address := os.Getenv("SERVER_ADDRESS"); Address != "" {
 		config.Address = Address
 	}
+	if v := os.Getenv("GRPC_SERVER_ADDRESS"); v != "" {
+		config.GRPCAddress = v
+	}
 	if ReturningAddress := os.Getenv("BASE_URL"); ReturningAddress != "" {
 		config.ReturningAddress = ReturningAddress
 	}

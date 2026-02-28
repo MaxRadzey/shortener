@@ -3,7 +3,8 @@ package config
 
 // Config — настройки приложения (адрес, БД, файл, логи, аудит, ключ подписи).
 type Config struct {
-	Address          string // адрес сервера (например :8080)
+	Address          string // адрес HTTP-сервера (например :8080)
+	GRPCAddress      string // адрес gRPC-сервера (например :9090)
 	ReturningAddress string // базовый URL для коротких ссылок в ответах
 	LogLevel         string // уровень логов (info, debug и т.д.)
 	FilePath         string // путь к файлу хранилища, если не используется БД
@@ -21,6 +22,7 @@ type Config struct {
 func New() *Config {
 	return &Config{
 		Address:          "localhost:8080",
+		GRPCAddress:      "localhost:9090",
 		ReturningAddress: "http://localhost:8080",
 		LogLevel:         "info",
 		FilePath:         "data.json",
