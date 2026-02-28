@@ -4,8 +4,8 @@ import (
 	"context"
 	"strings"
 
+	"github.com/MaxRadzey/shortener/internal/auth"
 	"github.com/MaxRadzey/shortener/internal/contextkeys"
-	"github.com/MaxRadzey/shortener/internal/middleware"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
 )
@@ -24,7 +24,7 @@ func AuthUnaryInterceptor(signingKey string) grpc.UnaryServerInterceptor {
 				if strings.HasPrefix(strings.ToLower(token), "bearer ") {
 					token = strings.TrimSpace(token[7:])
 				}
-				if id, err := middleware.ValidateAuthValue(token, signingKey); err == nil {
+				if id, err := auth.ValidateAuthValue(token, signingKey); err == nil {
 					userID = id
 				}
 			}

@@ -1,13 +1,13 @@
-// Package router настраивает маршруты и middleware для HTTP-сервера.
-package router
+// Package httpserver: router настраивает маршруты и middleware для HTTP-сервера.
+package httpserver
 
 import (
 	"net/http"
 
 	"github.com/MaxRadzey/shortener/internal/config"
-	"github.com/MaxRadzey/shortener/internal/handler"
+	"github.com/MaxRadzey/shortener/internal/httpserver/handler"
+	"github.com/MaxRadzey/shortener/internal/httpserver/middleware"
 	"github.com/MaxRadzey/shortener/internal/logger"
-	"github.com/MaxRadzey/shortener/internal/middleware"
 	"github.com/gin-gonic/gin"
 	"github.com/swaggo/swag"
 )
@@ -17,10 +17,9 @@ func SetupRouter(h *handler.Handler, cfg *config.Config) *gin.Engine {
 	r := gin.Default()
 	r.HandleMethodNotAllowed = true
 
-	SetupMiddleware(r)
+	setupMiddleware(r)
 
 	r.Use(logger.HTTPLogger())
-
 	r.Use(middleware.Gzip())
 	r.Use(middleware.Auth(cfg.SigningKey))
 
@@ -43,9 +42,8 @@ func SetupRouter(h *handler.Handler, cfg *config.Config) *gin.Engine {
 	return r
 }
 
-// SetupMiddleware вешает обработку NoMethod (405) на роутер.
-func SetupMiddleware(router *gin.Engine) {
-	router.NoMethod(func(c *gin.Context) {
+func setupMiddleware(r *gin.Engine) {
+	r.NoMethod(func(c *gin.Context) {
 		c.JSON(http.StatusMethodNotAllowed, gin.H{"error": "Method not allowed"})
 	})
 }

@@ -5,8 +5,9 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/MaxRadzey/shortener/internal/auth"
 	"github.com/MaxRadzey/shortener/internal/config"
-	httphandlers "github.com/MaxRadzey/shortener/internal/handler"
+	httphandlers "github.com/MaxRadzey/shortener/internal/httpserver/handler"
 	"github.com/MaxRadzey/shortener/internal/models"
 	"github.com/MaxRadzey/shortener/internal/service"
 	teststorage "github.com/MaxRadzey/shortener/internal/testing"
@@ -29,7 +30,6 @@ func TestAuth(t *testing.T) {
 		"XxLlqM": {ShortPath: "XxLlqM", FullURL: "https://vk.com", UserID: userID},
 	})
 
-	// Создаем handler
 	urlService := service.NewService(repo, *cfg)
 	handler := &httphandlers.Handler{Service: urlService}
 
@@ -51,7 +51,7 @@ func TestAuth(t *testing.T) {
 		{
 			name:           "Test #2 valid cookie - should authenticate and return 200",
 			cookiePresent:  true,
-			cookieValue:    createValidCookie(userID, secretKey),
+			cookieValue:    auth.NewCookie(userID, secretKey).Value,
 			expectedStatus: http.StatusOK,
 			expectCookie:   false,
 			description:    "При валидной куке миделварь должен аутентифицировать пользователя",
@@ -84,16 +84,14 @@ func TestAuth(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			// Создаем роутер с миделварью Auth
 			r := gin.New()
 			r.Use(Auth(cfg.SigningKey))
 			r.GET("/api/user/urls", handler.GetUserURLs)
 
-			// Создаем запрос
 			req := httptest.NewRequest(http.MethodGet, "/api/user/urls", nil)
 			if test.cookiePresent {
 				req.AddCookie(&http.Cookie{
-					Name:  cookieName,
+					Name:  auth.CookieName,
 					Value: test.cookieValue,
 				})
 			}
@@ -101,31 +99,21 @@ func TestAuth(t *testing.T) {
 			w := httptest.NewRecorder()
 			r.ServeHTTP(w, req)
 
-			// Проверяем код ответа - это главная проверка работы миделваря
 			require.Equal(t, test.expectedStatus, w.Code, test.description+": Код ответа не совпадает с ожидаемым")
 
-			// Проверяем наличие куки в ответе
 			res := w.Result()
 			defer res.Body.Close()
 			cookies := res.Cookies()
 			if test.expectCookie {
 				assert.Greater(t, len(cookies), 0, "Ожидалась установка куки")
-				// Проверяем, что кука валидна
 				if len(cookies) > 0 {
 					cookie := cookies[0]
-					assert.Equal(t, cookieName, cookie.Name, "Имя куки не совпадает")
+					assert.Equal(t, auth.CookieName, cookie.Name, "Имя куки не совпадает")
 					assert.NotEmpty(t, cookie.Value, "Значение куки не должно быть пустым")
-					// Проверяем, что кука валидна
-					_, err := validateCookie(cookie, secretKey)
+					_, err := auth.ValidateCookie(cookie, secretKey)
 					assert.NoError(t, err, "Кука должна быть валидной")
 				}
 			}
 		})
 	}
-}
-
-// createValidCookie создает валидную куку для тестов
-func createValidCookie(userID, secretKey string) string {
-	signature := signData(userID, secretKey)
-	return userID + "." + signature
 }

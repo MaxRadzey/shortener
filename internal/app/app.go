@@ -1,4 +1,4 @@
-// Package app собирает логгер, хранилище, сервис, роутер и запускает HTTP-сервер.
+// Package app собирает логгер, хранилище, сервис и запускает HTTP- и gRPC-серверы.
 package app
 
 import (
@@ -15,14 +15,13 @@ import (
 	"github.com/MaxRadzey/shortener/internal/audit"
 	"github.com/MaxRadzey/shortener/internal/config"
 	grpcpkg "github.com/MaxRadzey/shortener/internal/grpc"
-	"github.com/MaxRadzey/shortener/internal/grpc/proto"
-	httphandlers "github.com/MaxRadzey/shortener/internal/handler"
+	"github.com/MaxRadzey/shortener/internal/httpserver"
+	"github.com/MaxRadzey/shortener/internal/httpserver/handler"
 	"github.com/MaxRadzey/shortener/internal/logger"
-	"github.com/MaxRadzey/shortener/internal/router"
 	"github.com/MaxRadzey/shortener/internal/service"
 	"github.com/MaxRadzey/shortener/internal/storage"
 	"go.uber.org/zap"
-	"google.golang.org/grpc"
+	libgrpc "google.golang.org/grpc"
 )
 
 const shutdownTimeout = 30 * time.Second
@@ -31,12 +30,12 @@ const shutdownTimeout = 30 * time.Second
 type App struct {
 	config       *config.Config
 	server       *http.Server
-	grpcServer   *grpc.Server
+	grpcServer   *libgrpc.Server
 	grpcListener net.Listener
 	storage      *storage.StorageResult
 }
 
-// New создаёт приложение: инициализирует логгер, хранилище, сервис, хендлеры, роутер и HTTP-сервер.
+// New создаёт приложение: инициализирует логгер, хранилище, сервис и оба сервера (HTTP и gRPC).
 func New(cfg *config.Config) (*App, error) {
 	if err := logger.Initialize(cfg.LogLevel); err != nil {
 		return nil, err
@@ -49,24 +48,18 @@ func New(cfg *config.Config) (*App, error) {
 
 	urlService := service.NewService(storageResult.Repository, *cfg)
 	auditNotifier := audit.NewNotifier(cfg.AuditFile, cfg.AuditURL)
-	h := &httphandlers.Handler{Service: urlService, Audit: auditNotifier, TrustedSubnet: cfg.TrustedSubnet}
-	r := router.SetupRouter(h, cfg)
 
-	server := &http.Server{
-		Addr:    cfg.Address,
-		Handler: r,
+	httpHandler := &handler.Handler{
+		Service:       urlService,
+		Audit:         auditNotifier,
+		TrustedSubnet: cfg.TrustedSubnet,
 	}
+	server := httpserver.New(cfg, httpHandler)
 
-	grpcListener, err := net.Listen("tcp", cfg.GRPCAddress)
+	grpcServer, grpcListener, err := grpcpkg.NewServer(cfg, urlService, auditNotifier)
 	if err != nil {
 		return nil, err
 	}
-	grpcServer := grpc.NewServer(grpc.UnaryInterceptor(grpcpkg.AuthUnaryInterceptor(cfg.SigningKey)))
-	proto.RegisterShortenerServiceServer(grpcServer, &grpcpkg.Server{
-		Service: urlService,
-		Audit:   auditNotifier,
-		SignKey: cfg.SigningKey,
-	})
 
 	return &App{
 		config:       cfg,
@@ -85,8 +78,8 @@ func (a *App) Run() error {
 }
 
 func (a *App) startServer() {
-	go a.startHTTPServer()
-	go a.startGRPCServer()
+	go httpserver.Run(a.server, a.config)
+	go grpcpkg.Run(a.grpcServer, a.grpcListener)
 }
 
 func (a *App) shutdownSignal() <-chan os.Signal {
