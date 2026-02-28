@@ -79,31 +79,32 @@ func setAuthCookie(w http.ResponseWriter, userID, secretKey string) {
 	http.SetCookie(w, cookie)
 }
 
+// ValidateAuthValue проверяет значение авторизации (формат "userID.signature") и возвращает userID.
+// Используется для куки и для gRPC metadata authorization.
+func ValidateAuthValue(value, secretKey string) (string, error) {
+	if value == "" {
+		return "", errors.New("empty value")
+	}
+	parts := strings.Split(value, ".")
+	if len(parts) != 2 {
+		return "", errors.New("invalid format")
+	}
+	userID := parts[0]
+	signature := parts[1]
+	if _, err := uuid.Parse(userID); err != nil {
+		return "", fmt.Errorf("invalid user ID: %w", err)
+	}
+	expectedSignature := signData(userID, secretKey)
+	if !hmac.Equal([]byte(signature), []byte(expectedSignature)) {
+		return "", errors.New("invalid signature")
+	}
+	return userID, nil
+}
+
 // validateCookie проверяет валидность куки
 func validateCookie(cookie *http.Cookie, secretKey string) (string, error) {
 	if cookie.Value == "" {
 		return "", errors.New("empty cookie value")
 	}
-
-	// Разделяем userID и подпись
-	parts := strings.Split(cookie.Value, ".")
-	if len(parts) != 2 {
-		return "", errors.New("invalid cookie format")
-	}
-
-	userID := parts[0]
-	signature := parts[1]
-
-	// Проверяем что userID - валидный UUID
-	if _, err := uuid.Parse(userID); err != nil {
-		return "", fmt.Errorf("invalid user ID: %w", err)
-	}
-
-	// Проверяем подпись
-	expectedSignature := signData(userID, secretKey)
-	if !hmac.Equal([]byte(signature), []byte(expectedSignature)) {
-		return "", errors.New("invalid signature")
-	}
-
-	return userID, nil
+	return ValidateAuthValue(cookie.Value, secretKey)
 }

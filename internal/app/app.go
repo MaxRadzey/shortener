@@ -3,6 +3,7 @@ package app
 
 import (
 	"context"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -13,21 +14,26 @@ import (
 
 	"github.com/MaxRadzey/shortener/internal/audit"
 	"github.com/MaxRadzey/shortener/internal/config"
+	grpcpkg "github.com/MaxRadzey/shortener/internal/grpc"
+	"github.com/MaxRadzey/shortener/internal/grpc/proto"
 	httphandlers "github.com/MaxRadzey/shortener/internal/handler"
 	"github.com/MaxRadzey/shortener/internal/logger"
 	"github.com/MaxRadzey/shortener/internal/router"
 	"github.com/MaxRadzey/shortener/internal/service"
 	"github.com/MaxRadzey/shortener/internal/storage"
 	"go.uber.org/zap"
+	"google.golang.org/grpc"
 )
 
 const shutdownTimeout = 30 * time.Second
 
-// App — приложение: конфиг, HTTP-сервер и хранилище.
+// App — приложение: конфиг, HTTP- и gRPC-серверы и хранилище.
 type App struct {
-	config  *config.Config
-	server  *http.Server
-	storage *storage.StorageResult
+	config       *config.Config
+	server       *http.Server
+	grpcServer   *grpc.Server
+	grpcListener net.Listener
+	storage      *storage.StorageResult
 }
 
 // New создаёт приложение: инициализирует логгер, хранилище, сервис, хендлеры, роутер и HTTP-сервер.
@@ -51,10 +57,23 @@ func New(cfg *config.Config) (*App, error) {
 		Handler: r,
 	}
 
+	grpcListener, err := net.Listen("tcp", cfg.GRPCAddress)
+	if err != nil {
+		return nil, err
+	}
+	grpcServer := grpc.NewServer(grpc.UnaryInterceptor(grpcpkg.AuthUnaryInterceptor(cfg.SigningKey)))
+	proto.RegisterShortenerServiceServer(grpcServer, &grpcpkg.Server{
+		Service: urlService,
+		Audit:   auditNotifier,
+		SignKey: cfg.SigningKey,
+	})
+
 	return &App{
-		config:  cfg,
-		server:  server,
-		storage: storageResult,
+		config:       cfg,
+		server:       server,
+		grpcServer:   grpcServer,
+		grpcListener: grpcListener,
+		storage:      storageResult,
 	}, nil
 }
 
@@ -66,19 +85,8 @@ func (a *App) Run() error {
 }
 
 func (a *App) startServer() {
-	logger.Log.Info("Starting HTTP server", zap.String("address", a.config.Address))
-	go func() {
-		var err error
-		if a.config.EnableHTTPS {
-			logger.Log.Info("HTTPS mode enabled")
-			err = a.server.ListenAndServeTLS("server.crt", "server.key")
-		} else {
-			err = a.server.ListenAndServe()
-		}
-		if err != nil && err != http.ErrServerClosed {
-			logger.Log.Error("server error", zap.Error(err))
-		}
-	}()
+	go a.startHTTPServer()
+	go a.startGRPCServer()
 }
 
 func (a *App) shutdownSignal() <-chan os.Signal {
@@ -92,6 +100,11 @@ func (a *App) gracefulShutdown() error {
 
 	ctx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
 	defer cancel()
+
+	if err := a.grpcListener.Close(); err != nil {
+		logger.Log.Error("gRPC listener close error", zap.Error(err))
+	}
+	a.grpcServer.GracefulStop()
 
 	if err := a.server.Shutdown(ctx); err != nil {
 		logger.Log.Error("server shutdown error", zap.Error(err))
