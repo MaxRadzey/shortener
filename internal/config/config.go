@@ -9,11 +9,12 @@ type Config struct {
 	FilePath         string // путь к файлу хранилища, если не используется БД
 	DatabaseDSN      string // строка подключения к PostgreSQL; пусто — БД не используется
 
-	SigningKey  string // SigningKey — секрет для подписи куки (в проде задавать через SECRET_KEY)
-	AuditFile   string // путь к файлу аудита; пусто — выключено
-	AuditURL    string // URL приёмника аудита; пусто — выключено
-	DevMode     bool   // режим разработки (pprof и т.п.)
-	EnableHTTPS bool   // включает запуск сервера по HTTPS (TLS)
+	SigningKey    string // SigningKey — секрет для подписи куки (в проде задавать через SECRET_KEY)
+	AuditFile     string // путь к файлу аудита; пусто — выключено
+	AuditURL      string // URL приёмника аудита; пусто — выключено
+	DevMode       bool   // режим разработки (pprof и т.п.)
+	EnableHTTPS   bool   // включает запуск сервера по HTTPS (TLS)
+	TrustedSubnet string // CIDR доверенной подсети
 }
 
 // New возвращает конфиг с дефолтными значениями.

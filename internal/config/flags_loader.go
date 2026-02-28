@@ -13,6 +13,7 @@ func ParseFlags(config *Config) {
 	flag.StringVar(&config.AuditURL, "audit-url", config.AuditURL, "URL of remote audit receiver (empty = disabled)")
 	flag.BoolVar(&config.DevMode, "dev", config.DevMode, "enable dev mode")
 	flag.BoolVar(&config.EnableHTTPS, "s", config.EnableHTTPS, "enable HTTPS (TLS) server mode")
+	flag.StringVar(&config.TrustedSubnet, "t", config.TrustedSubnet, "trusted subnet CIDR for internal stats API (e.g. 192.168.1.0/24)")
 
 	flag.Parse()
 }

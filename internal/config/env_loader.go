@@ -39,4 +39,7 @@ func ParseEnv(config *Config) {
 			config.EnableHTTPS = true
 		}
 	}
+	if v := os.Getenv("TRUSTED_SUBNET"); v != "" {
+		config.TrustedSubnet = v
+	}
 }

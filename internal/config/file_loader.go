@@ -16,11 +16,12 @@ type fileConfig struct {
 	DatabaseDSN      *string `json:"database_dsn"`
 	EnableHTTPS      *bool   `json:"enable_https"`
 
-	LogLevel   *string `json:"log_level"`
-	SigningKey *string `json:"secret_key"`
-	AuditFile  *string `json:"audit_file"`
-	AuditURL   *string `json:"audit_url"`
-	DevMode    *bool   `json:"dev_mode"`
+	LogLevel      *string `json:"log_level"`
+	SigningKey    *string `json:"secret_key"`
+	AuditFile     *string `json:"audit_file"`
+	AuditURL      *string `json:"audit_url"`
+	DevMode       *bool   `json:"dev_mode"`
+	TrustedSubnet *string `json:"trusted_subnet"`
 }
 
 // ParseFile заполняет config значениями из JSON-файла.
@@ -72,6 +73,9 @@ func ParseFile(config *Config) {
 	}
 	if fc.DevMode != nil {
 		config.DevMode = *fc.DevMode
+	}
+	if fc.TrustedSubnet != nil {
+		config.TrustedSubnet = *fc.TrustedSubnet
 	}
 }
 
