@@ -3,6 +3,7 @@ package httpserver
 
 import (
 	"net/http"
+	"time"
 
 	"github.com/MaxRadzey/shortener/internal/config"
 	"github.com/MaxRadzey/shortener/internal/httpserver/handler"
@@ -14,8 +15,12 @@ import (
 func New(cfg *config.Config, h *handler.Handler) *http.Server {
 	r := SetupRouter(h, cfg)
 	return &http.Server{
-		Addr:    cfg.Address,
-		Handler: r,
+		Addr:              cfg.Address,
+		Handler:           r,
+		ReadTimeout:       10 * time.Second,
+		ReadHeaderTimeout: 5 * time.Second,
+		WriteTimeout:      10 * time.Second,
+		IdleTimeout:       60 * time.Second,
 	}
 }
 

@@ -47,10 +47,6 @@ func main() {
 
 	AppConfig := config.New()
 
-	config.ParseFile(AppConfig)
-	config.ParseEnv(AppConfig)
-	config.ParseFlags(AppConfig)
-
 	application, err := app.New(AppConfig)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "failed to init app: %v\n", err)
