@@ -16,11 +16,8 @@ type Pool[T Resettable] struct {
 }
 
 // New создаёт новый Pool, который создаёт значения через newFn, когда пул пуст.
+// newFn не должен быть nil.
 func New[T Resettable](newFn func() T) *Pool[T] {
-	if newFn == nil {
-		panic("pool.New: newFn is nil")
-	}
-
 	pl := &Pool[T]{}
 	pl.p.New = func() any { return newFn() }
 	return pl
