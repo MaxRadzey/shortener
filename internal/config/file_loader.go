@@ -16,6 +16,8 @@ type fileConfig struct {
 	FilePath         *string `json:"file_storage_path"`
 	DatabaseDSN      *string `json:"database_dsn"`
 	EnableHTTPS      *bool   `json:"enable_https"`
+	TLSCertFile      *string `json:"tls_cert_file"`
+	TLSKeyFile       *string `json:"tls_key_file"`
 
 	LogLevel      *string `json:"log_level"`
 	SigningKey    *string `json:"secret_key"`
@@ -62,6 +64,12 @@ func ParseFile(config *Config) {
 	}
 	if fc.EnableHTTPS != nil {
 		config.EnableHTTPS = *fc.EnableHTTPS
+	}
+	if fc.TLSCertFile != nil {
+		config.TLSCertFile = *fc.TLSCertFile
+	}
+	if fc.TLSKeyFile != nil {
+		config.TLSKeyFile = *fc.TLSKeyFile
 	}
 	if fc.LogLevel != nil {
 		config.LogLevel = *fc.LogLevel

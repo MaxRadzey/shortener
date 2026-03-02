@@ -85,23 +85,13 @@ func (s *Service) Ping(ctx context.Context) error {
 
 // Stats возвращает количество URL и уникальных пользователей в хранилище.
 func (s *Service) Stats(ctx context.Context) (urls int, users int, err error) {
-	var wg sync.WaitGroup
-	wg.Add(2)
-	var errURLs, errUsers error
-	go func() {
-		defer wg.Done()
-		urls, errURLs = s.repo.CountURLs(ctx)
-	}()
-	go func() {
-		defer wg.Done()
-		users, errUsers = s.repo.CountUsers(ctx)
-	}()
-	wg.Wait()
-	if errURLs != nil {
-		return 0, 0, fmt.Errorf("count URLs: %w", errURLs)
+	urls, err = s.repo.CountURLs(ctx)
+	if err != nil {
+		return 0, 0, fmt.Errorf("count URLs: %w", err)
 	}
-	if errUsers != nil {
-		return 0, 0, fmt.Errorf("count users: %w", errUsers)
+	users, err = s.repo.CountUsers(ctx)
+	if err != nil {
+		return 0, 0, fmt.Errorf("count users: %w", err)
 	}
 	return urls, users, nil
 }

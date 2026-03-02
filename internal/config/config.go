@@ -17,6 +17,8 @@ type Config struct {
 	AuditURL      string `env:"AUDIT_URL"`      // URL приёмника аудита; пусто — выключено
 	DevMode       bool   `env:"DEV_MODE"`       // режим разработки (pprof и т.п.)
 	EnableHTTPS   bool   `env:"ENABLE_HTTPS"`   // включает запуск сервера по HTTPS (TLS)
+	TLSCertFile   string `env:"TLS_CERT_FILE"`  // путь к сертификату для TLS
+	TLSKeyFile    string `env:"TLS_KEY_FILE"`   // путь к ключу для TLS
 	TrustedSubnet string `env:"TRUSTED_SUBNET"` // CIDR доверенной подсети
 }
 
@@ -30,6 +32,8 @@ func New() *Config {
 		FilePath:         "data.json",
 		DatabaseDSN:      "postgres://shortener:shortener@localhost:5432/shortener",
 		SigningKey:       "dev-signing-key-change-in-production",
+		TLSCertFile:      "server.crt",
+		TLSKeyFile:       "server.key",
 	}
 	ParseFile(cfg)
 	_ = cleanenv.ReadEnv(cfg)

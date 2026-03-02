@@ -56,7 +56,7 @@ func New(cfg *config.Config) (*App, error) {
 	}
 	server := httpserver.New(cfg, httpHandler)
 
-	grpcServer, grpcListener, err := grpcpkg.NewServer(cfg, urlService, auditNotifier)
+	grpcServer, grpcListener, err := grpcpkg.Setup(cfg, urlService, auditNotifier)
 	if err != nil {
 		return nil, err
 	}

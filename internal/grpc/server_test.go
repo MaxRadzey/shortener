@@ -27,7 +27,7 @@ func setupTestServer(t *testing.T, repo repository.URLRepository) *Server {
 	t.Helper()
 	cfg := testGRPCConfig
 	svc := service.NewService(repo, cfg)
-	return &Server{Service: svc, SignKey: cfg.SigningKey}
+	return NewGRPCServer(svc, nil, cfg.SigningKey)
 }
 
 func ctxWithUser(userID string) context.Context {

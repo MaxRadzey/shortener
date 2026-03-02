@@ -20,9 +20,18 @@ import (
 // Server реализует ShortenerService и является фасадом над service.Service.
 type Server struct {
 	proto.UnimplementedShortenerServiceServer
-	Service *service.Service
-	Audit   *audit.Notifier
-	SignKey string
+	service *service.Service
+	audit   *audit.Notifier
+	signKey string
+}
+
+// NewGRPCServer возвращает gRPC-фасад с приватными полями (в т.ч. signKey не экспортируется).
+func NewGRPCServer(svc *service.Service, auditNotifier *audit.Notifier, signKey string) *Server {
+	return &Server{
+		service: svc,
+		audit:   auditNotifier,
+		signKey: signKey,
+	}
 }
 
 func userIDFromContext(ctx context.Context) string {
@@ -43,20 +52,20 @@ func (s *Server) ShortenURL(ctx context.Context, req *proto.URLShortenRequest) (
 	if urlStr == "" || !utils.IsValidURL(urlStr) {
 		return nil, status.Error(codes.InvalidArgument, "invalid url")
 	}
-	result, err := s.Service.CreateShortURL(urlStr, userID)
+	result, err := s.service.CreateShortURL(urlStr, userID)
 	if err != nil {
 		var conflict *service.ErrURLConflict
 		if errors.As(err, &conflict) {
-			if s.Audit != nil {
-				s.Audit.Notify(audit.NewEvent("shorten", userID, urlStr))
+			if s.audit != nil {
+				s.audit.Notify(audit.NewEvent("shorten", userID, urlStr))
 			}
 			return &proto.URLShortenResponse{Result: conflict.ShortURL}, nil
 		}
 		logger.Log.Error("ShortenURL", zap.Error(err))
 		return nil, status.Error(codes.Internal, "internal error")
 	}
-	if s.Audit != nil {
-		s.Audit.Notify(audit.NewEvent("shorten", userID, urlStr))
+	if s.audit != nil {
+		s.audit.Notify(audit.NewEvent("shorten", userID, urlStr))
 	}
 	return &proto.URLShortenResponse{Result: result}, nil
 }
@@ -66,7 +75,7 @@ func (s *Server) ExpandURL(ctx context.Context, req *proto.URLExpandRequest) (*p
 	if id == "" {
 		return nil, status.Error(codes.InvalidArgument, "missing id")
 	}
-	longURL, err := s.Service.GetLongURL(id)
+	longURL, err := s.service.GetLongURL(id)
 	if err != nil {
 		var notFound *service.ErrNotFound
 		var gone *service.ErrGone
@@ -87,7 +96,7 @@ func (s *Server) ListUserURLs(ctx context.Context, _ *emptypb.Empty) (*proto.Use
 	if userID == "" {
 		return nil, status.Error(codes.Unauthenticated, "missing or invalid authorization")
 	}
-	items, err := s.Service.GetUserURLs(ctx, userID)
+	items, err := s.service.GetUserURLs(ctx, userID)
 	if err != nil {
 		logger.Log.Error("ListUserURLs", zap.Error(err))
 		return nil, status.Error(codes.Internal, "internal error")

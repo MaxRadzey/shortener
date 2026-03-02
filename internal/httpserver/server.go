@@ -30,7 +30,7 @@ func Run(server *http.Server, cfg *config.Config) {
 	var err error
 	if cfg.EnableHTTPS {
 		logger.Log.Info("HTTPS mode enabled")
-		err = server.ListenAndServeTLS("server.crt", "server.key")
+		err = server.ListenAndServeTLS(cfg.TLSCertFile, cfg.TLSKeyFile)
 	} else {
 		err = server.ListenAndServe()
 	}
