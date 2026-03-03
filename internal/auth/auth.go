@@ -77,13 +77,13 @@ func setAuthCookie(w http.ResponseWriter, userID, secret string) {
 	http.SetCookie(w, cookie)
 }
 
-// ValidateCookie проверяет валидность куки и возвращает userID, если кука валидна.
-// Возвращает ошибку, если кука невалидна или отсутствует.
-func ValidateCookie(cookie *http.Cookie, secret string) (string, error) {
-	if cookie == nil || cookie.Value == "" {
+// ValidateAuthValue проверяет значение авторизации (формат "userID.signature") и возвращает userID.
+// Используется для куки (значение куки) и для gRPC metadata authorization.
+func ValidateAuthValue(value, secret string) (string, error) {
+	if value == "" {
 		return "", ErrEmptyCookieValue
 	}
-	parts := strings.SplitN(cookie.Value, ".", 2)
+	parts := strings.SplitN(value, ".", 2)
 	if len(parts) != 2 {
 		return "", ErrInvalidCookieFormat
 	}
@@ -97,6 +97,15 @@ func ValidateCookie(cookie *http.Cookie, secret string) (string, error) {
 		return "", ErrInvalidSignature
 	}
 	return userID, nil
+}
+
+// ValidateCookie проверяет валидность куки и возвращает userID, если кука валидна.
+// Возвращает ошибку, если кука невалидна или отсутствует.
+func ValidateCookie(cookie *http.Cookie, secret string) (string, error) {
+	if cookie == nil || cookie.Value == "" {
+		return "", ErrEmptyCookieValue
+	}
+	return ValidateAuthValue(cookie.Value, secret)
 }
 
 func validateCookie(cookie *http.Cookie, secret string) (string, error) {

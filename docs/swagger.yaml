@@ -94,6 +94,27 @@ paths:
       summary: Редирект по короткой ссылке
       tags:
       - url
+  /api/internal/stats:
+    get:
+      parameters:
+      - description: IP клиента (должен входить в доверенную подсеть)
+        in: header
+        name: X-Real-IP
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: количество url и пользователей
+        "403":
+          description: доступ запрещён (IP не в доверенной подсети)
+        "500":
+          description: внутренняя ошибка
+          schema:
+            $ref: '#/definitions/handler.errResp'
+      summary: Статистика сервиса (внутренний API)
+      tags:
+      - internal
   /api/shorten:
     post:
       consumes:

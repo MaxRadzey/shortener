@@ -1,8 +1,9 @@
-// Package app собирает логгер, хранилище, сервис, роутер и запускает HTTP-сервер.
+// Package app собирает логгер, хранилище, сервис и запускает HTTP- и gRPC-серверы.
 package app
 
 import (
 	"context"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -13,24 +14,28 @@ import (
 
 	"github.com/MaxRadzey/shortener/internal/audit"
 	"github.com/MaxRadzey/shortener/internal/config"
-	httphandlers "github.com/MaxRadzey/shortener/internal/handler"
+	grpcpkg "github.com/MaxRadzey/shortener/internal/grpc"
+	"github.com/MaxRadzey/shortener/internal/httpserver"
+	"github.com/MaxRadzey/shortener/internal/httpserver/handler"
 	"github.com/MaxRadzey/shortener/internal/logger"
-	"github.com/MaxRadzey/shortener/internal/router"
 	"github.com/MaxRadzey/shortener/internal/service"
 	"github.com/MaxRadzey/shortener/internal/storage"
 	"go.uber.org/zap"
+	libgrpc "google.golang.org/grpc"
 )
 
 const shutdownTimeout = 30 * time.Second
 
-// App — приложение: конфиг, HTTP-сервер и хранилище.
+// App — приложение: конфиг, HTTP- и gRPC-серверы и хранилище.
 type App struct {
-	config  *config.Config
-	server  *http.Server
-	storage *storage.StorageResult
+	config       *config.Config
+	server       *http.Server
+	grpcServer   *libgrpc.Server
+	grpcListener net.Listener
+	storage      *storage.StorageResult
 }
 
-// New создаёт приложение: инициализирует логгер, хранилище, сервис, хендлеры, роутер и HTTP-сервер.
+// New создаёт приложение: инициализирует логгер, хранилище, сервис и оба сервера (HTTP и gRPC).
 func New(cfg *config.Config) (*App, error) {
 	if err := logger.Initialize(cfg.LogLevel); err != nil {
 		return nil, err
@@ -43,18 +48,25 @@ func New(cfg *config.Config) (*App, error) {
 
 	urlService := service.NewService(storageResult.Repository, *cfg)
 	auditNotifier := audit.NewNotifier(cfg.AuditFile, cfg.AuditURL)
-	h := &httphandlers.Handler{Service: urlService, Audit: auditNotifier}
-	r := router.SetupRouter(h, cfg)
 
-	server := &http.Server{
-		Addr:    cfg.Address,
-		Handler: r,
+	httpHandler := &handler.Handler{
+		Service:       urlService,
+		Audit:         auditNotifier,
+		TrustedSubnet: cfg.TrustedSubnet,
+	}
+	server := httpserver.New(cfg, httpHandler)
+
+	grpcServer, grpcListener, err := grpcpkg.Setup(cfg, urlService, auditNotifier)
+	if err != nil {
+		return nil, err
 	}
 
 	return &App{
-		config:  cfg,
-		server:  server,
-		storage: storageResult,
+		config:       cfg,
+		server:       server,
+		grpcServer:   grpcServer,
+		grpcListener: grpcListener,
+		storage:      storageResult,
 	}, nil
 }
 
@@ -66,19 +78,8 @@ func (a *App) Run() error {
 }
 
 func (a *App) startServer() {
-	logger.Log.Info("Starting HTTP server", zap.String("address", a.config.Address))
-	go func() {
-		var err error
-		if a.config.EnableHTTPS {
-			logger.Log.Info("HTTPS mode enabled")
-			err = a.server.ListenAndServeTLS("server.crt", "server.key")
-		} else {
-			err = a.server.ListenAndServe()
-		}
-		if err != nil && err != http.ErrServerClosed {
-			logger.Log.Error("server error", zap.Error(err))
-		}
-	}()
+	go httpserver.Run(a.server, a.config)
+	go grpcpkg.Run(a.grpcServer, a.grpcListener)
 }
 
 func (a *App) shutdownSignal() <-chan os.Signal {
@@ -92,6 +93,11 @@ func (a *App) gracefulShutdown() error {
 
 	ctx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
 	defer cancel()
+
+	if err := a.grpcListener.Close(); err != nil {
+		logger.Log.Error("gRPC listener close error", zap.Error(err))
+	}
+	a.grpcServer.GracefulStop()
 
 	if err := a.server.Shutdown(ctx); err != nil {
 		logger.Log.Error("server shutdown error", zap.Error(err))

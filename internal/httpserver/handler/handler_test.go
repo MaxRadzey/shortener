@@ -10,10 +10,10 @@ import (
 
 	"github.com/MaxRadzey/shortener/internal/config"
 	"github.com/MaxRadzey/shortener/internal/contextkeys"
-	"github.com/MaxRadzey/shortener/internal/handler"
+	"github.com/MaxRadzey/shortener/internal/httpserver"
+	"github.com/MaxRadzey/shortener/internal/httpserver/handler"
 	"github.com/MaxRadzey/shortener/internal/models"
 	"github.com/MaxRadzey/shortener/internal/repository"
-	"github.com/MaxRadzey/shortener/internal/router"
 	"github.com/MaxRadzey/shortener/internal/service"
 	teststorage "github.com/MaxRadzey/shortener/internal/testing"
 	"github.com/gin-gonic/gin"
@@ -30,13 +30,11 @@ var testConfig = &config.Config{
 	SigningKey:       "dev-signing-key-change-in-production",
 }
 
-// setupTestHandler создает handler для тестов с указанным репозиторием.
 func setupTestHandler(repo repository.URLRepository) *handler.Handler {
 	urlService := service.NewService(repo, *testConfig)
 	return &handler.Handler{Service: urlService}
 }
 
-// assertResponse проверяет ответ: если оба ответа валидный JSON - сравнивает как JSON, иначе как строки
 func assertResponse(t *testing.T, expected, actual string) {
 	t.Helper()
 	var actualJSON, expectedJSON interface{}
@@ -50,13 +48,12 @@ func assertResponse(t *testing.T, expected, actual string) {
 
 func TestGetURL(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	// Хранилище: обычная запись и удалённая (IsDeleted: true)
 	repo := teststorage.NewFakeRepositoryWithEntries(map[string]models.URLEntry{
 		"XxLlqM": {ShortPath: "XxLlqM", FullURL: "https://vk.com", UserID: "", IsDeleted: false},
 		"AbCdEf": {ShortPath: "AbCdEf", FullURL: "https://ya.ru", UserID: "", IsDeleted: true},
 	})
 	h := setupTestHandler(repo)
-	rt := router.SetupRouter(h, testConfig)
+	rt := httpserver.SetupRouter(h, testConfig)
 
 	type want struct {
 		code     int
@@ -124,7 +121,7 @@ func TestCreateURL(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	repo := teststorage.NewFakeRepositoryWithData(nil)
 	h := setupTestHandler(repo)
-	rt := router.SetupRouter(h, testConfig)
+	rt := httpserver.SetupRouter(h, testConfig)
 
 	type want struct {
 		code     int
@@ -186,7 +183,7 @@ func TestGetURLJSON(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	repo := teststorage.NewFakeRepositoryWithData(nil)
 	h := setupTestHandler(repo)
-	rt := router.SetupRouter(h, testConfig)
+	rt := httpserver.SetupRouter(h, testConfig)
 
 	type want struct {
 		code     int
@@ -267,7 +264,7 @@ func TestCreateURLBatch(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	repo := teststorage.NewFakeRepositoryWithData(nil)
 	h := setupTestHandler(repo)
-	rt := router.SetupRouter(h, testConfig)
+	rt := httpserver.SetupRouter(h, testConfig)
 
 	type want struct {
 		code        int
@@ -387,7 +384,6 @@ func TestCreateURLBatch(t *testing.T) {
 }
 
 func TestGetUserURLs(t *testing.T) {
-	// Создаем storage с данными для конкретного пользователя
 	userID := "test-user-id"
 	repo := teststorage.NewFakeRepositoryWithEntries(map[string]models.URLEntry{
 		"XxLlqM": {ShortPath: "XxLlqM", FullURL: "https://vk.com", UserID: userID},
@@ -416,7 +412,7 @@ func TestGetUserURLs(t *testing.T) {
 			want: want{
 				code:        http.StatusOK,
 				contentType: "application/json",
-				response:    `[{"short_url":"http://localhost:8080/XxLlqM","original_url":"https://vk.com"},{"short_url":"http://localhost:8080/AbCdEf","original_url":"https://ya.ru"}]`,
+				response:    `[{"short_url":"http://localhost:8080/AbCdEf","original_url":"https://ya.ru"},{"short_url":"http://localhost:8080/XxLlqM","original_url":"https://vk.com"}]`,
 			},
 		},
 		{
@@ -547,4 +543,71 @@ func TestDeleteURLs(t *testing.T) {
 			require.Equal(t, test.want.code, rec.Code, "Код ответа не совпадает с ожидаемым")
 		})
 	}
+}
+
+func TestHandler_GetInternalStats(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	trustedSubnet := "127.0.0.0/8"
+	cfg := *testConfig
+	cfg.TrustedSubnet = trustedSubnet
+
+	t.Run("with no data", func(t *testing.T) {
+		repo := teststorage.NewFakeRepository()
+		urlService := service.NewService(repo, cfg)
+		h := &handler.Handler{Service: urlService, TrustedSubnet: trustedSubnet}
+		rt := httpserver.SetupRouter(h, &cfg)
+
+		req := httptest.NewRequest(http.MethodGet, "/api/internal/stats", nil)
+		req.Header.Set("X-Real-IP", "127.0.0.1")
+		rec := httptest.NewRecorder()
+		rt.ServeHTTP(rec, req)
+
+		require.Equal(t, http.StatusOK, rec.Code)
+		var body struct {
+			URLs  int `json:"urls"`
+			Users int `json:"users"`
+		}
+		require.NoError(t, json.NewDecoder(rec.Body).Decode(&body))
+		assert.Equal(t, 0, body.URLs)
+		assert.Equal(t, 0, body.Users)
+	})
+
+	t.Run("with data returns urls and users count", func(t *testing.T) {
+		repo := teststorage.NewFakeRepositoryWithEntries(map[string]models.URLEntry{
+			"a1": {ShortPath: "a1", FullURL: "https://a.com", UserID: "user1"},
+			"b2": {ShortPath: "b2", FullURL: "https://b.com", UserID: "user1"},
+			"c3": {ShortPath: "c3", FullURL: "https://c.com", UserID: "user2"},
+		})
+		urlService := service.NewService(repo, cfg)
+		h := &handler.Handler{Service: urlService, TrustedSubnet: trustedSubnet}
+		rt := httpserver.SetupRouter(h, &cfg)
+
+		req := httptest.NewRequest(http.MethodGet, "/api/internal/stats", nil)
+		req.Header.Set("X-Real-IP", "127.0.0.1")
+		rec := httptest.NewRecorder()
+		rt.ServeHTTP(rec, req)
+
+		require.Equal(t, http.StatusOK, rec.Code)
+		var body struct {
+			URLs  int `json:"urls"`
+			Users int `json:"users"`
+		}
+		require.NoError(t, json.NewDecoder(rec.Body).Decode(&body))
+		assert.Equal(t, 3, body.URLs, "urls count")
+		assert.Equal(t, 2, body.Users, "users count")
+	})
+
+	t.Run("invalid IP returns 403", func(t *testing.T) {
+		repo := teststorage.NewFakeRepository()
+		urlService := service.NewService(repo, cfg)
+		h := &handler.Handler{Service: urlService, TrustedSubnet: trustedSubnet}
+		rt := httpserver.SetupRouter(h, &cfg)
+
+		req := httptest.NewRequest(http.MethodGet, "/api/internal/stats", nil)
+		req.Header.Set("X-Real-IP", "192.168.1.1")
+		rec := httptest.NewRecorder()
+		rt.ServeHTTP(rec, req)
+
+		require.Equal(t, http.StatusForbidden, rec.Code)
+	})
 }

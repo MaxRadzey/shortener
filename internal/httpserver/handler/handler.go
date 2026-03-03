@@ -20,8 +20,9 @@ import (
 
 // Handler обрабатывает HTTP-запросы к эндпоинтам коротких ссылок.
 type Handler struct {
-	Service *service.Service
-	Audit   *audit.Notifier
+	Service       *service.Service
+	Audit         *audit.Notifier
+	TrustedSubnet string
 }
 
 type errResp struct {
@@ -73,16 +74,6 @@ func (h *Handler) decodeJSONBody(c *gin.Context, target interface{}) bool {
 }
 
 // CreateURL — POST /: принимает URL в теле (text/plain), возвращает короткую ссылку (201) или конфликт (409).
-//
-// @Summary  Создать короткую ссылку (text/plain)
-// @Tags     url
-// @Accept   plain
-// @Produce  plain
-// @Param    body body string true "URL в теле"
-// @Success  201  {string} string "короткая ссылка"
-// @Failure  400  {object} errResp "невалидное тело"
-// @Failure  409  {string} string "URL уже сокращён, в теле — существующая короткая ссылка"
-// @Router   / [post]
 func (h *Handler) CreateURL(c *gin.Context) {
 	userID, ok := h.userIDFromContext(c)
 	if !ok {
@@ -105,7 +96,6 @@ func (h *Handler) CreateURL(c *gin.Context) {
 
 	result, err := h.Service.CreateShortURL(text, userID)
 	if err != nil {
-		// Проверяем, является ли ошибка конфликтом существующего URL
 		var conflictErr *service.ErrURLConflict
 		if errors.As(err, &conflictErr) {
 			if h.Audit != nil {
@@ -128,14 +118,6 @@ func (h *Handler) CreateURL(c *gin.Context) {
 }
 
 // GetURL — GET /:short_path: редирект на оригинальный URL (307), иначе 404 или 410 если удалён.
-//
-// @Summary  Редирект по короткой ссылке
-// @Tags     url
-// @Param    short_path path string true "короткий идентификатор"
-// @Success  307  "редирект на оригинальный URL"
-// @Failure  404  {object} errResp "не найдено"
-// @Failure  410  {object} errResp "ссылка удалена"
-// @Router   /{short_path} [get]
 func (h *Handler) GetURL(c *gin.Context) {
 	shortPath := c.Param("short_path")
 	longURL, err := h.Service.GetLongURL(shortPath)
@@ -158,16 +140,6 @@ func (h *Handler) GetURL(c *gin.Context) {
 }
 
 // GetURLJSON — POST /api/shorten: тело JSON {"url":"..."}, в ответе {"result":"короткая ссылка"}.
-//
-// @Summary  Создать короткую ссылку (JSON)
-// @Tags     url
-// @Accept   json
-// @Produce  json
-// @Param    body body models.Request true "URL"
-// @Success  201  {object} models.Response "короткая ссылка"
-// @Failure  400  {object} errResp "невалидный запрос"
-// @Failure  409  {object} models.Response "URL уже сокращён"
-// @Router   /api/shorten [post]
 func (h *Handler) GetURLJSON(c *gin.Context) {
 	userID, ok := h.userIDFromContext(c)
 	if !ok {
@@ -187,7 +159,6 @@ func (h *Handler) GetURLJSON(c *gin.Context) {
 
 	result, err := h.Service.CreateShortURL(req.URL, userID)
 	if err != nil {
-		// Проверяем, является ли ошибка конфликтом существующего URL
 		var conflictErr *service.ErrURLConflict
 		if errors.As(err, &conflictErr) {
 			if h.Audit != nil {
@@ -210,13 +181,6 @@ func (h *Handler) GetURLJSON(c *gin.Context) {
 }
 
 // Ping — GET /ping: проверка доступности хранилища, 200 или 500.
-//
-// @Summary  Проверка доступности хранилища
-// @Tags     health
-// @Produce  plain
-// @Success  200  {string} string "OK"
-// @Failure  500  {object} errResp "ошибка соединения"
-// @Router   /ping [get]
 func (h *Handler) Ping(c *gin.Context) {
 	ctx := c.Request.Context()
 	if err := h.Service.Ping(ctx); err != nil {
@@ -229,15 +193,6 @@ func (h *Handler) Ping(c *gin.Context) {
 }
 
 // CreateURLBatch — POST /api/shorten/batch: массив {correlation_id, original_url}, ответ — массив {correlation_id, short_url}.
-//
-// @Summary  Создать несколько коротких ссылок
-// @Tags     url
-// @Accept   json
-// @Produce  json
-// @Param    body body []models.BatchRequestItem true "массив URL с correlation_id"
-// @Success  201  {array}  models.BatchResponseItem "массив short_url с теми же correlation_id"
-// @Failure  400  {object} errResp "невалидный запрос"
-// @Router   /api/shorten/batch [post]
 func (h *Handler) CreateURLBatch(c *gin.Context) {
 	var reqItems []models.BatchRequestItem
 	if !h.decodeJSONBody(c, &reqItems) {
@@ -274,14 +229,6 @@ func (h *Handler) CreateURLBatch(c *gin.Context) {
 }
 
 // GetUserURLs — GET /api/user/urls: список коротких ссылок пользователя (200) или 204 если пусто.
-//
-// @Summary  Список ссылок пользователя
-// @Tags     user
-// @Produce  json
-// @Success  200  {array}  models.UserURLItem "список short_url и original_url"
-// @Success  204  "нет ссылок"
-// @Failure  401  "не авторизован"
-// @Router   /api/user/urls [get]
 func (h *Handler) GetUserURLs(c *gin.Context) {
 	userID, ok := h.requireUserID(c)
 	if !ok {
@@ -305,15 +252,6 @@ func (h *Handler) GetUserURLs(c *gin.Context) {
 }
 
 // DeleteURLs — DELETE /api/user/urls: тело — JSON-массив short URL; удаление асинхронное, ответ 202.
-//
-// @Summary  Удалить ссылки пользователя (асинхронно)
-// @Tags     user
-// @Accept   json
-// @Param    body body []string true "массив коротких URL для удаления"
-// @Success  202  "запрос принят"
-// @Failure  400  {object} errResp "невалидное тело"
-// @Failure  401  "не авторизован"
-// @Router   /api/user/urls [delete]
 func (h *Handler) DeleteURLs(c *gin.Context) {
 	userID, ok := h.requireUserID(c)
 	if !ok {
@@ -330,13 +268,31 @@ func (h *Handler) DeleteURLs(c *gin.Context) {
 		return
 	}
 
-	// Запускаем асинхронное удаление в горутине.
 	go func() {
 		if err := h.Service.DeleteURLs(context.Background(), userID, shortUrls); err != nil {
 			logger.Log.Error("Failed to delete URLs", zap.Error(err))
-			// Не оповещаем пользователя об ошибках, так как удаление асинхронное
 		}
 	}()
 
 	c.Status(http.StatusAccepted)
+}
+
+// GetInternalStats — GET /api/internal/stats: возвращает количество URL и пользователей.
+func (h *Handler) GetInternalStats(c *gin.Context) {
+	clientIP := c.GetHeader("X-Real-IP")
+
+	if !utils.IsIPInTrustedSubnet(clientIP, h.TrustedSubnet) {
+		c.AbortWithStatus(http.StatusForbidden)
+		return
+	}
+
+	ctx := c.Request.Context()
+	urls, users, err := h.Service.Stats(ctx)
+	if err != nil {
+		logger.Log.Error("Failed to get stats", zap.Error(err))
+		h.sendErrorJSON(c, http.StatusInternalServerError, "Internal server error")
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"urls": urls, "users": users})
 }

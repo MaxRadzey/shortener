@@ -448,3 +448,74 @@ func TestPostgresRepository_Ping(t *testing.T) {
 		require.NoError(t, err)
 	})
 }
+
+func TestPostgresRepository_CountURLs(t *testing.T) {
+	repo := setupDB(t)
+	ctx := context.Background()
+
+	t.Run("empty table returns zero", func(t *testing.T) {
+		n, err := repo.CountURLs(ctx)
+		require.NoError(t, err)
+		assert.Equal(t, 0, n)
+	})
+
+	t.Run("returns count after create", func(t *testing.T) {
+		userID := uuid.New().String()
+		items := []models.URLEntry{
+			{ShortPath: "cnt1", FullURL: "https://cnt1.com", UserID: userID},
+			{ShortPath: "cnt2", FullURL: "https://cnt2.com", UserID: userID},
+			{ShortPath: "cnt3", FullURL: "https://cnt3.com", UserID: userID},
+		}
+		err := repo.CreateBatch(ctx, items)
+		require.NoError(t, err)
+
+		n, err := repo.CountURLs(ctx)
+		require.NoError(t, err)
+		assert.Equal(t, 3, n)
+	})
+}
+
+func TestPostgresRepository_CountUsers(t *testing.T) {
+	repo := setupDB(t)
+	ctx := context.Background()
+
+	t.Run("empty table returns zero", func(t *testing.T) {
+		n, err := repo.CountUsers(ctx)
+		require.NoError(t, err)
+		assert.Equal(t, 0, n)
+	})
+
+	t.Run("single user with multiple URLs returns one", func(t *testing.T) {
+		userID := uuid.New().String()
+		items := []models.URLEntry{
+			{ShortPath: "u1a", FullURL: "https://u1a.com", UserID: userID},
+			{ShortPath: "u1b", FullURL: "https://u1b.com", UserID: userID},
+		}
+		err := repo.CreateBatch(ctx, items)
+		require.NoError(t, err)
+
+		n, err := repo.CountUsers(ctx)
+		require.NoError(t, err)
+		assert.Equal(t, 1, n)
+	})
+
+	t.Run("multiple users returns distinct count", func(t *testing.T) {
+		_, err := testDB.Exec(ctx, "TRUNCATE TABLE urls RESTART IDENTITY CASCADE")
+		require.NoError(t, err)
+
+		userID1 := uuid.New().String()
+		userID2 := uuid.New().String()
+		userID3 := uuid.New().String()
+
+		err = repo.Create(models.URLEntry{ShortPath: "m1", FullURL: "https://m1.com", UserID: userID1})
+		require.NoError(t, err)
+		err = repo.Create(models.URLEntry{ShortPath: "m2", FullURL: "https://m2.com", UserID: userID2})
+		require.NoError(t, err)
+		err = repo.Create(models.URLEntry{ShortPath: "m3", FullURL: "https://m3.com", UserID: userID3})
+		require.NoError(t, err)
+
+		n, err := repo.CountUsers(ctx)
+		require.NoError(t, err)
+		assert.Equal(t, 3, n)
+	})
+}

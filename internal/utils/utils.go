@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"hash"
+	"net"
 	"net/url"
 	"strings"
 	"sync"
@@ -41,6 +42,23 @@ func GetShortPath(path string) (string, error) {
 func IsValidURL(urlToCheck string) bool {
 	_, err := url.ParseRequestURI(urlToCheck)
 	return err == nil
+}
+
+// IsIPInTrustedSubnet проверяет, входит ли clientIP в подсеть cidr (CIDR).
+// При пустом cidr возвращает false (доступ запрещён). При невалидном IP или CIDR — false.
+func IsIPInTrustedSubnet(clientIP, cidr string) bool {
+	if cidr == "" {
+		return false
+	}
+	ip := net.ParseIP(clientIP)
+	if ip == nil {
+		return false
+	}
+	_, network, err := net.ParseCIDR(cidr)
+	if err != nil {
+		return false
+	}
+	return network.Contains(ip)
 }
 
 // MaskDSN возвращает DSN с замаскированным паролем для логов.

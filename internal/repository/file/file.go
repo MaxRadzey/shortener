@@ -196,3 +196,29 @@ func (s *FileRepository) Ping(ctx context.Context) error {
 	_ = file.Close()
 	return nil
 }
+
+// CountURLs возвращает количество записей в файле.
+func (s *FileRepository) CountURLs(ctx context.Context) (int, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	data, err := s.readFromFile()
+	if err != nil {
+		return 0, fmt.Errorf("read from file error: %w", err)
+	}
+	return len(data), nil
+}
+
+// CountUsers возвращает количество уникальных user_id в файле.
+func (s *FileRepository) CountUsers(ctx context.Context) (int, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	data, err := s.readFromFile()
+	if err != nil {
+		return 0, fmt.Errorf("read from file error: %w", err)
+	}
+	users := make(map[string]struct{})
+	for _, r := range data {
+		users[r.UserID] = struct{}{}
+	}
+	return len(users), nil
+}

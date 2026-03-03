@@ -60,6 +60,39 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/internal/stats": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "internal"
+                ],
+                "summary": "Статистика сервиса (внутренний API)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "IP клиента (должен входить в доверенную подсеть)",
+                        "name": "X-Real-IP",
+                        "in": "header"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "количество url и пользователей"
+                    },
+                    "403": {
+                        "description": "доступ запрещён (IP не в доверенной подсети)"
+                    },
+                    "500": {
+                        "description": "внутренняя ошибка",
+                        "schema": {
+                            "$ref": "#/definitions/handler.errResp"
+                        }
+                    }
+                }
+            }
+        },
         "/api/shorten": {
             "post": {
                 "consumes": [

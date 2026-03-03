@@ -181,3 +181,23 @@ func (p *PostgresRepository) DeleteBatch(ctx context.Context, userID string, sho
 func (p *PostgresRepository) Ping(ctx context.Context) error {
 	return p.db.Ping(ctx)
 }
+
+// CountURLs возвращает количество записей в таблице urls.
+func (p *PostgresRepository) CountURLs(ctx context.Context) (int, error) {
+	var n int
+	err := p.db.QueryRow(ctx, "SELECT COUNT(*) FROM urls").Scan(&n)
+	if err != nil {
+		return 0, fmt.Errorf("failed to count URLs: %w", err)
+	}
+	return n, nil
+}
+
+// CountUsers возвращает количество уникальных user_id в таблице urls.
+func (p *PostgresRepository) CountUsers(ctx context.Context) (int, error) {
+	var n int
+	err := p.db.QueryRow(ctx, "SELECT COUNT(DISTINCT user_id) FROM urls").Scan(&n)
+	if err != nil {
+		return 0, fmt.Errorf("failed to count users: %w", err)
+	}
+	return n, nil
+}

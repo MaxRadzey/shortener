@@ -16,7 +16,7 @@ run:
 
 # Запуск всех тестов одной командой
 test:
-	go test ./... -v
+	go test ./... -v -count=1
 
 # Запуск статического анализатора (panic, log.Fatal/os.Exit вне main)
 lint:
